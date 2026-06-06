@@ -668,65 +668,111 @@ function renderJuniorRoleSelect() {
 function selectJuniorRole(role) {
   State.juniorRole = role; State.score = 0; State.fixedResumeItems = {};
   var rd = RESUME_ROLES[role];
-  setDialogue('点击红色虚线的"雷区"，AI立刻告诉你问题在哪并直接替换为专业表述！');
-  renderJuniorFindStage();
+  setDialogue('下面是份' + rd.name + '方向的简历草稿——充斥着大学生的常见写法。准备好了就点击下方的 AI 按钮，一键批量进化成面试官想看的 STAR 法则表述！');
+  renderJuniorResume();
 }
 
-// ===== 大三简历渲染（状态驱动纯块级流布局） =====
-function renderJuniorFindStage() {
+// ===== 大三简历渲染（状态驱动纯块级流，单按钮批量进化） =====
+function renderJuniorResume() {
   var stage = $('game-stage'), rd = RESUME_ROLES[State.juniorRole], fixes = rd.fixes;
-  var fixedCount = 0;
-  for (var k in State.fixedResumeItems) {
-    if (State.fixedResumeItems[k] === 'fixed') fixedCount++;
-  }
-
-  // 构建 HTML：纯块级文档流，无 flex、无 absolute、无 overflow-hidden
-  var html = '';
-  html += '<div style="background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(0,82,217,0.08);border:1px solid #f1f5f9;font-size:14px;line-height:1.6;color:#334155;">';
-  html += '<div style="text-align:center;margin-bottom:16px;">';
-  html += '<div style="font-weight:900;font-size:18px;color:#1e293b;">求职简历</div>';
-  html += '<div style="font-size:12px;color:#94a3b8;">应聘：' + rd.name + ' | 大三 | XX大学</div>';
-  html += '</div>';
-  html += '<div style="font-weight:700;margin-bottom:8px;">项目与经历 (点击红色虚线直接修复)</div>';
-
+  var allFixed = true;
   for (var i = 0; i < fixes.length; i++) {
-    var fix = fixes[i];
-    var isFixed = State.fixedResumeItems[i] === 'fixed';
-    // 每条条目：独立的块级容器，占据完整行宽，自然撑开
-    html += '<div style="margin-bottom:12px;width:100%;clear:both;">';
-    html += '<span style="color:#cbd5e1;margin-right:6px;">&#x2022;</span>';
-    if (isFixed) {
-      html += '<span class="resume-bad fixed" style="display:inline;word-break:break-word;">' + fix.good + '</span>';
-      html += ' <span style="color:#10b981;font-size:12px;">&#x2714;</span>';
-    } else {
-      html += '<span class="resume-bad" id="bad-' + i + '" onclick="fixResumeIssue(' + i + ')" style="display:inline;word-break:break-word;">' + fix.bad + '</span>';
-      html += ' <span style="color:#ef4444;font-size:12px;cursor:pointer;" onclick="fixResumeIssue(' + i + ')">点击修复</span>';
-    }
-    html += '</div>';
+    if (State.fixedResumeItems[i] !== 'fixed') { allFixed = false; break; }
   }
 
-  html += '</div>';
-  stage.innerHTML = html;
-  // 确保 stage 和上层容器都不裁剪内容
   stage.style.overflow = 'visible';
   stage.style.height = 'auto';
   stage.style.maxHeight = 'none';
 
-  $('action-area').innerHTML = '<div style="text-align:center;font-size:12px;color:#94a3b8;" id="resume-fix-count">已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')</div>' + (fixedCount >= fixes.length ? '<button onclick="startTranslator()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-2">第一关通关！进入项目翻译机</button>' : '');
+  if (!allFixed) {
+    // ===== 进化前：集中展示所有痛点 =====
+    var html = '';
+    html += '<div style="background:#fff;border-radius:16px;padding:20px 16px;box-shadow:0 2px 12px rgba(0,82,217,0.08);border:1px solid #f1f5f9;font-size:14px;line-height:1.6;color:#334155;">';
+    html += '<div style="text-align:center;margin-bottom:16px;">';
+    html += '<div style="font-weight:900;font-size:18px;color:#1e293b;">求职简历 (优化前)</div>';
+    html += '<div style="font-size:12px;color:#94a3b8;">应聘：' + rd.name + ' | 大三 | XX大学</div>';
+    html += '</div>';
+    html += '<div style="margin-bottom:8px;font-weight:700;color:#ef4444;">以下 ' + fixes.length + ' 处描述需要 AI 重塑：</div>';
+
+    for (var i = 0; i < fixes.length; i++) {
+      var fix = fixes[i];
+      html += '<div style="margin-bottom:14px;width:100%;clear:both;padding:10px 12px;background:#fef2f2;border-radius:10px;border-left:4px solid #ef4444;">';
+      html += '<div style="font-size:11px;color:#ef4444;margin-bottom:4px;font-weight:700;">雷区 #' + (i + 1) + '</div>';
+      html += '<div style="font-size:13px;color:#7f1d1d;line-height:1.5;word-break:break-word;">' + fix.bad + '</div>';
+      html += '<div style="font-size:11px;color:#b91c1c;margin-top:4px;font-style:italic;">问题：' + fix.spot + '</div>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+    stage.innerHTML = html;
+
+    // 一键进化按钮
+    $('action-area').innerHTML = '<button onclick="batchTransform()" id="btn-batch-transform" class="w-full py-4 text-white font-bold rounded-xl transition-all text-sm" style="background:linear-gradient(135deg,#0052D9,#366ef4);box-shadow:0 4px 20px rgba(0,82,217,0.3);font-size:15px;letter-spacing:0.5px;">一键全能进化标准简历</button><div style="text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;">AI 将批量诊断并重写全部 ' + fixes.length + ' 处，生成 STAR 法则黄金表述</div>';
+
+  } else {
+    // ===== 进化后：逐条展示前后对比 =====
+    var html = '';
+    html += '<div style="background:#fff;border-radius:16px;padding:20px 16px;box-shadow:0 2px 12px rgba(0,82,217,0.08);border:2px solid #10b981;font-size:14px;line-height:1.6;color:#334155;">';
+    html += '<div style="text-align:center;margin-bottom:20px;">';
+    html += '<div style="font-size:32px;margin-bottom:4px;">&#x2705;</div>';
+    html += '<div style="font-weight:900;font-size:18px;color:#10b981;">AI 批量重塑完成</div>';
+    html += '<div style="font-size:12px;color:#94a3b8;">应聘：' + rd.name + ' | STAR 法则黄金版</div>';
+    html += '</div>';
+
+    for (var i = 0; i < fixes.length; i++) {
+      var fix = fixes[i];
+      html += '<div style="margin-bottom:18px;width:100%;clear:both;border-bottom:1px dashed #e5e7eb;padding-bottom:14px;">';
+      html += '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;font-weight:700;">对比 #' + (i + 1) + '</div>';
+      // 错误原句（灰色删除线）
+      html += '<div style="padding:8px 12px;background:#f8fafc;border-radius:8px;margin-bottom:8px;font-size:12px;color:#94a3b8;text-decoration:line-through;word-break:break-word;line-height:1.5;">' + fix.bad + '</div>';
+      // 向下箭头
+      html += '<div style="text-align:center;color:#10b981;font-size:16px;margin:4px 0;">&#x2193;</div>';
+      // STAR 黄金句式（绿色高亮）
+      html += '<div style="padding:10px 12px;background:#f0fdf4;border-radius:10px;border-left:4px solid #10b981;font-size:13px;color:#15803d;word-break:break-word;line-height:1.6;">' + fix.good + '</div>';
+      // 翻译提示
+      html += '<div style="font-size:11px;color:#65a30d;margin-top:4px;font-style:italic;">' + fix.spot + '</div>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+
+    // 通关奖励卡片
+    html += '<div style="margin-top:16px;background:linear-gradient(135deg,#eff6ff,#f0fdf4);border-radius:16px;padding:16px;text-align:center;border:1px solid #bfdbfe;">';
+    html += '<div style="font-size:28px;margin-bottom:4px;">&#x1F3C6;</div>';
+    html += '<div style="font-weight:900;font-size:16px;color:#0052D9;margin-bottom:4px;">大三简历特训通关！</div>';
+    html += '<div style="font-size:13px;color:#334155;line-height:1.6;">核心竞争力 +30 &nbsp;|&nbsp; 求职成熟度 +25</div>';
+    html += '<div style="font-size:12px;color:#64748b;margin-top:4px;">建议立刻前往大四板块进行模拟面试实战</div>';
+    html += '</div>';
+
+    stage.innerHTML = html;
+
+    $('action-area').innerHTML = '<button onclick="startTranslator()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm">进阶挑战：项目翻译机</button><button onclick="backToEntry()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-sm mt-1">返回首页</button>';
+  }
 }
 
-// ===== 状态驱动修复：更新数据 → 整体重渲染 =====
-function fixResumeIssue(i) {
-  if (State.fixedResumeItems[i] === 'fixed') return;
+// ===== 批量进化：一键标记全部修复 + 播放音效 + 重渲染 =====
+function batchTransform() {
   var rd = RESUME_ROLES[State.juniorRole];
-  // 第一步：更新状态数据
-  State.fixedResumeItems[i] = 'fixed';
-  State.score += 2;
-  State.addStat('competency', 10); State.addStat('readiness', 8); State.updateUI(); saveProgress();
-  // 第二步：设置对话提示
-  setDialogue('修复完成！雷区：' + rd.fixes[i].spot + '\n\n修改后：' + rd.fixes[i].good);
-  // 第三步：基于最新状态，整体重新渲染列表
-  renderJuniorFindStage();
+  // 模拟 AI 处理中（按钮动画）
+  var btn = $('btn-batch-transform');
+  if (btn) { btn.disabled = true; btn.textContent = 'AI 正在逐条诊断中...'; btn.style.opacity = '0.7'; }
+
+  // 短暂延迟后批量完成（给用户 AI 处理的感知）
+  setTimeout(function() {
+    // 批量标记全部已修复
+    for (var i = 0; i < rd.fixes.length; i++) {
+      State.fixedResumeItems[i] = 'fixed';
+    }
+    State.score = rd.fixes.length * 2;
+    State.addStat('competency', 30);
+    State.addStat('readiness', 25);
+    State.updateUI();
+    saveProgress();
+    AudioFX.success();
+
+    setDialogue('AI 批量诊断完成！' + rd.fixes.length + ' 处简历雷区全部修复为 STAR 法则表述。向下滑动查看每一条的前后对比——看到"优化前"到"优化后"的变化了吗？这就是大厂面试官想看到的说服力。');
+    renderJuniorResume();
+  }, 1200);
 }
 
 function startTranslator() {
