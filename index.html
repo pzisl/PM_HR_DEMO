@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>未来鹅 - 大学生职业成长AI陪伴体</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+  * { font-family: 'Noto Sans SC', sans-serif; box-sizing: border-box; }
+  body { background: linear-gradient(135deg, #e8f0fe 0%, #f0f4ff 30%, #fef9ef 70%, #f0f4ff 100%); min-height: 100vh; overflow-x: hidden; }
+  .card-flat { background: #fff; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,82,217,0.08); transition: all 0.3s ease; }
+  .card-flat:hover { box-shadow: 0 8px 30px rgba(0,82,217,0.15); transform: translateY(-2px); }
+  .stat-bar-bg { background: #e5e7eb; border-radius: 999px; overflow: hidden; height: 8px; }
+  .stat-bar-fill { height: 100%; border-radius: 999px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+
+  .flip-card { perspective: 800px; width: 100%; height: 170px; cursor: pointer; }
+  .flip-card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+  .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+  .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; }
+  .flip-card-front { background: #fff; border: 2px solid #e0e7ff; }
+  .flip-card-back { background: linear-gradient(135deg, #0052D9, #366ef4); color: #fff; transform: rotateY(180deg); overflow-y: auto; }
+
+  .game-canvas { position: relative; overflow: hidden; background: linear-gradient(180deg, #e8f0fe 0%, #dbeafe 100%); border-radius: 16px; user-select: none; -webkit-user-select: none; touch-action: none; }
+  @keyframes fallDown { from{transform:translateY(-60px)} to{transform:translateY(420px)} }
+  .fall-item { position: absolute; animation: fallDown linear forwards; pointer-events: none; border-radius: 12px; padding: 6px 10px; font-size: 24px; text-align: center; z-index: 5; white-space: nowrap; border: 2px solid #e5e7eb; background: #fff; border-left-width: 4px; }
+  .fall-item.trap-hint { border-left-color: #fca5a5; background: #fff5f5; }
+  .fall-item.golden-hint { border-left-color: #fcd34d; background: #fffdf5; }
+  .penguin { position: absolute; bottom: 8px; left: 0; transform: translateX(0px); will-change: transform; z-index: 10; }
+
+  .resume-bad { background: #fee2e2; border-bottom: 2px dashed #ef4444; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.4s ease; display: inline-block; margin: 1px 0; }
+  .resume-bad:hover { background: #fecaca; }
+  .resume-bad.fixed { background: #d1fae5; border-bottom: 2px solid #10b981; cursor: default; animation: fixPulse 0.4s ease; }
+  @keyframes fixPulse { 0%{transform:scale(1)} 50%{transform:scale(1.06)} 100%{transform:scale(1)} }
+
+  .qte-bar { height: 6px; border-radius: 999px; transition: width 0.1s linear; }
+  @keyframes urgentPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .urgent-pulse { animation: urgentPulse 0.5s ease-in-out infinite; }
+  @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  .fade-in-up { animation: fadeInUp 0.5s ease forwards; }
+  @keyframes popIn { 0%{transform:scale(0.8);opacity:0} 70%{transform:scale(1.05);opacity:1} 100%{transform:scale(1);opacity:1} }
+  .pop-in { animation: popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+  ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  .choice-btn { transition: all 0.2s ease; }
+  .choice-btn:hover { transform: translateX(4px); box-shadow: 0 4px 12px rgba(0,82,217,0.1); }
+  .choice-btn:active { transform: scale(0.98); }
+  .choice-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .tab-btn { transition: all 0.2s ease; border-bottom: 2px solid transparent; }
+  .tab-btn.active { border-bottom-color: #0052D9; color: #0052D9; font-weight: 700; }
+</style>
+</head>
+<body class="flex items-center justify-center p-3 md:p-6">
+<div id="app" class="w-full max-w-2xl mx-auto">
+
+  <div id="entry-screen" style="display:block;">
+    <div class="text-center mb-6 fade-in-up">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-200 mx-auto mb-2">鹅</div>
+      <h1 class="text-2xl md:text-3xl font-black text-slate-800 tracking-wide">未来鹅</h1>
+      <p class="text-slate-500 text-sm mt-1">大学生职业成长 AI 陪伴体</p>
+    </div>
+    <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 mb-5 fade-in-up" style="animation-delay:0.05s">
+      <div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span><span class="text-xs font-bold text-slate-700">腾讯校招官网动态</span></div><span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">2026暑期实习</span></div>
+      <div class="space-y-2 text-xs text-slate-600"><div class="flex justify-between border-b border-dashed border-slate-100 pb-1"><span>简历投递窗口</span><span class="text-blue-600 font-medium">进行中</span></div><div class="flex justify-between border-b border-dashed border-slate-100 pb-1"><span>第一批在线笔试</span><span class="text-amber-600">预计3月中旬</span></div><div class="flex justify-between"><span>青云计划</span><span class="text-purple-600">长期开放</span></div></div>
+      <a href="https://join.qq.com" target="_blank" rel="noopener" class="w-full mt-3 block text-center py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl text-sm transition-all">直通官网一键投递</a>
+    </div>
+    <p class="text-center text-slate-500 text-sm mb-5 fade-in-up" style="animation-delay:0.1s">你好，我是你的 AI 学长。你现在大几？</p>
+    <div class="grid grid-cols-2 gap-3 md:gap-4">
+      <div onclick="startGrade('freshman')" class="card-flat p-5 cursor-pointer group fade-in-up" role="button" tabindex="0" aria-label="大一" style="animation-delay:0.12s"><div class="text-3xl mb-2">&#x1F393;</div><h3 class="font-bold text-slate-800 group-hover:text-blue-600">大一</h3><p class="text-xs text-slate-400 mt-1">BG盲盒+黑话字典<br>基因合成器</p><div class="mt-2 inline-block px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600">AI岗位匹配</div></div>
+      <div onclick="startGrade('sophomore')" class="card-flat p-5 cursor-pointer group fade-in-up" role="button" tabindex="0" aria-label="大二" style="animation-delay:0.17s"><div class="text-3xl mb-2">&#x1F4AA;</div><h3 class="font-bold text-slate-800 group-hover:text-green-600">大二</h3><p class="text-xs text-slate-400 mt-1">技能接接乐<br>雷达图+诊断书</p><div class="mt-2 inline-block px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-600">技能树生成</div></div>
+      <div onclick="startGrade('junior')" class="card-flat p-5 cursor-pointer group fade-in-up" role="button" tabindex="0" aria-label="大三" style="animation-delay:0.22s"><div class="text-3xl mb-2">&#x1F4DD;</div><h3 class="font-bold text-slate-800 group-hover:text-orange-600">大三</h3><p class="text-xs text-slate-400 mt-1">简历急诊室<br>找茬+项目翻译机</p><div class="mt-2 inline-block px-2 py-0.5 rounded-full text-xs bg-orange-50 text-orange-600">连连看+STAR</div></div>
+      <div onclick="startGrade('senior')" class="card-flat p-5 cursor-pointer group fade-in-up" role="button" tabindex="0" aria-label="大四" style="animation-delay:0.27s"><div class="text-3xl mb-2">&#x1F3AF;</div><h3 class="font-bold text-slate-800 group-hover:text-purple-600">大四/研究生</h3><p class="text-xs text-slate-400 mt-1">多结局面试<br>好感度+情绪急救</p><div class="mt-2 inline-block px-2 py-0.5 rounded-full text-xs bg-purple-50 text-purple-600">压力演练</div></div>
+    </div>
+    <p class="text-center text-xs text-slate-400 mt-5">点击年级卡片开启成长之旅 | Esc 返回首页</p>
+  </div>
+
+  <div id="game-screen" style="display:none;">
+    <div id="status-panel" class="bg-white/80 backdrop-blur rounded-2xl p-4 mb-4 card-flat">
+      <div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2"><div class="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-xs">鹅</div><span class="font-bold text-slate-700 text-sm" id="grade-label">大一</span></div><button onclick="backToEntry()" class="text-xs text-slate-400 hover:text-slate-600 px-3 py-1 rounded-lg hover:bg-slate-100">返回首页</button></div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        <div><div class="text-slate-500 mb-0.5">精力与自驱力</div><div class="stat-bar-bg"><div id="bar-selfdrive" class="stat-bar-fill" style="width:70%;background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div></div><span id="val-selfdrive" class="text-slate-600">70</span></div>
+        <div><div class="text-slate-500 mb-0.5">大厂认知度</div><div class="stat-bar-bg"><div id="bar-awareness" class="stat-bar-fill" style="width:10%;background:linear-gradient(90deg,#0052D9,#60a5fa)"></div></div><span id="val-awareness" class="text-slate-600">10</span></div>
+        <div><div class="text-slate-500 mb-0.5">核心竞争力</div><div class="stat-bar-bg"><div id="bar-competency" class="stat-bar-fill" style="width:10%;background:linear-gradient(90deg,#10b981,#34d399)"></div></div><span id="val-competency" class="text-slate-600">10</span></div>
+        <div><div class="text-slate-500 mb-0.5">求职成熟度</div><div class="stat-bar-bg"><div id="bar-readiness" class="stat-bar-fill" style="width:5%;background:linear-gradient(90deg,#7c3aed,#a78bfa)"></div></div><span id="val-readiness" class="text-slate-600">5</span></div>
+      </div>
+      <div id="impression-bar-wrap" style="display:none;" class="mt-3 pt-3 border-t border-slate-100"><div class="flex items-center gap-2"><span class="text-xs" id="interviewer-face">&#x1F610;</span><span class="text-xs text-slate-500">面试官好感度</span><div class="flex-1 stat-bar-bg"><div id="bar-impression" class="stat-bar-fill" style="width:50%;background:linear-gradient(90deg,#ec4899,#f472b6)"></div></div><span id="val-impression" class="text-xs text-slate-600">50</span></div></div>
+    </div>
+    <div id="dialogue-box" class="bg-white/90 backdrop-blur rounded-2xl p-5 mb-4 card-flat" style="min-height:90px;"><div class="flex items-start gap-3"><div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0 mt-0.5">AI</div><div><div id="dialogue-text" class="text-slate-700 text-sm leading-relaxed"></div></div></div></div>
+    <div id="game-stage" class="mb-4"></div>
+    <div id="action-area" class="space-y-2"></div>
+  </div>
+
+  <div id="complete-modal" class="fixed inset-0 z-50 flex items-center justify-center" style="display:none;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px)">
+    <div class="bg-white rounded-2xl p-8 max-w-sm mx-4 text-center shadow-2xl pop-in"><div class="text-5xl mb-3" id="modal-icon">&#x1F389;</div><h2 class="text-xl font-black text-slate-800 mb-2" id="modal-title"></h2><p class="text-slate-500 text-sm mb-4 whitespace-pre-line" id="modal-desc"></p><div class="flex gap-3 justify-center flex-wrap"><button onclick="backToEntry()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-sm">返回首页</button><button onclick="closeModal();restartCurrentGrade()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl text-sm">再玩一次</button></div></div>
+  </div>
+
+</div>
+
+<script>
+var _debugErrors = [];
+
+window.onerror = function(msg, url, line, col, err) {
+  _debugErrors.push(msg + ' at line ' + line);
+  var gs = document.getElementById('game-stage');
+  if (gs) gs.innerHTML = '<div class=\"bg-red-50 rounded-xl p-4 text-red-600 text-xs\">JS Error: ' + msg + ' (line ' + line + ')</div>';
+  return false;
+};
+
+// ==================== 状态 ====================
+var State = {
+  grade: null, stats: {selfDrive:70, awareness:10, competency:10, readiness:5},
+  gameTimers: [], gameListeners: [], gameRunning: false,
+  roundIndex: 0, score: 0, impression: 50,
+  revealedCards: {}, fixedResumeItems: {}, sophomorePhase: 0,
+  juniorRole: null, seniorPool: [], seniorPhase: 0,
+  catchStats: {tech:0, product:0, design:0, trap:0, golden:0},
+  _hasSavedProgress: false, _translatorRunning: false,
+
+  reset: function() {
+    this.grade = null;
+    this.stats = {selfDrive:70, awareness:10, competency:10, readiness:5};
+    this.clearAllTimers();
+    this.clearAllListeners();
+    this.gameRunning = false;
+    this.roundIndex = 0; this.score = 0; this.impression = 50;
+    this.revealedCards = {}; this.fixedResumeItems = {}; this.sophomorePhase = 0;
+    this.juniorRole = null; this.seniorPool = []; this.seniorPhase = 0;
+    this.catchStats = {tech:0, product:0, design:0, trap:0, golden:0};
+    this._hasSavedProgress = false; this._translatorRunning = false;
+  },
+
+  addTimer: function(t) { this.gameTimers.push(t); },
+  clearAllTimers: function() {
+    for (var i = 0; i < this.gameTimers.length; i++) {
+      clearTimeout(this.gameTimers[i]);
+      clearInterval(this.gameTimers[i]);
+    }
+    this.gameTimers = [];
+  },
+
+  addListener: function(el, ev, fn, opts) {
+    el.addEventListener(ev, fn, opts);
+    this.gameListeners.push({el:el, ev:ev, fn:fn, opts:opts});
+  },
+  clearAllListeners: function() {
+    for (var i = 0; i < this.gameListeners.length; i++) {
+      var l = this.gameListeners[i];
+      l.el.removeEventListener(l.ev, l.fn, l.opts);
+    }
+    this.gameListeners = [];
+  },
+
+  addStat: function(k, v) { this.stats[k] = Math.max(0, Math.min(100, this.stats[k] + v)); },
+  updateUI: function() {
+    var s = this;
+    ['selfDrive','awareness','competency','readiness'].forEach(function(k) {
+      var b = document.getElementById('bar-' + k);
+      var v = document.getElementById('val-' + k);
+      if (b) b.style.width = s.stats[k] + '%';
+      if (v) v.textContent = s.stats[k];
+    });
+  }
+};
+
+function $(id) { return document.getElementById(id); }
+
+function showEntry() {
+  var e = $('entry-screen'), g = $('game-screen'), m = $('complete-modal');
+  if (e) e.style.display = 'block';
+  if (g) g.style.display = 'none';
+  if (m) m.style.display = 'none';
+  State.reset();
+}
+
+function showGame() {
+  var e = $('entry-screen'), g = $('game-screen'), m = $('complete-modal');
+  if (e) e.style.display = 'none';
+  if (g) g.style.display = 'block';
+  if (m) m.style.display = 'none';
+  State.updateUI();
+}
+
+function backToEntry() { saveProgress(); State.reset(); showEntry(); }
+function setDialogue(t) { var el = $('dialogue-text'); if (el) el.textContent = t; }
+
+function clearStage() {
+  State.clearAllTimers(); State.clearAllListeners();
+  var s = $('game-stage'), a = $('action-area');
+  if (s) s.innerHTML = ''; if (a) a.innerHTML = '';
+}
+
+function showCompleteModal(icon, title, desc) {
+  var mi = $('modal-icon'), mt = $('modal-title'), md = $('modal-desc'), cm = $('complete-modal');
+  if (mi) mi.innerHTML = icon; if (mt) mt.textContent = title;
+  if (md) md.textContent = desc; if (cm) cm.style.display = 'flex';
+}
+function closeModal() { var cm = $('complete-modal'); if (cm) cm.style.display = 'none'; }
+
+function restartCurrentGrade() {
+  closeModal(); clearStage();
+  State.roundIndex = 0; State.score = 0; State.impression = 50;
+  State.revealedCards = {}; State.fixedResumeItems = {}; State.sophomorePhase = 0;
+  State.juniorRole = null; State.seniorPool = []; State.seniorPhase = 0;
+  State.catchStats = {tech:0, product:0, design:0, trap:0, golden:0};
+  startGrade(State.grade);
+}
+
+function shuffle(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+function linkBtn(label) {
+  return '<a href=\"https://join.qq.com\" target=\"_blank\" rel=\"noopener\" class=\"w-full mt-2 block text-center py-2.5 bg-white hover:bg-slate-50 text-blue-600 font-medium rounded-xl text-sm transition-all border border-blue-200\">' + label + '</a>';
+}
+
+function saveProgress() {
+  try {
+    var d = {grade:State.grade, stats:State.stats, revealedCards:State.revealedCards, catchStats:State.catchStats, fixedResumeItems:State.fixedResumeItems};
+    localStorage.setItem('futuregoose_progress', JSON.stringify(d));
+  } catch(e) {}
+}
+
+function loadProgress(grade) {
+  try {
+    var raw = localStorage.getItem('futuregoose_progress');
+    if (!raw) return null;
+    var d = JSON.parse(raw);
+    if (d.grade === grade) return d;
+    return null;
+  } catch(e) { return null; }
+}
+
+function startGrade(grade) {
+  try {
+    State.reset(); State.grade = grade; showGame();
+    var labels = {freshman:'大一', sophomore:'大二', junior:'大三', senior:'大四/研究生'};
+    var lbl = $('grade-label'); if (lbl) lbl.textContent = labels[grade] || grade;
+    var initStats = {
+      freshman: {selfDrive:70, awareness:10, competency:5, readiness:5},
+      sophomore: {selfDrive:65, awareness:25, competency:20, readiness:15},
+      junior: {selfDrive:60, awareness:40, competency:35, readiness:40},
+      senior: {selfDrive:55, awareness:55, competency:50, readiness:60}
+    };
+    var s = initStats[grade] || initStats['freshman'];
+    State.stats = {selfDrive:s.selfDrive, awareness:s.awareness, competency:s.competency, readiness:s.readiness};
+    var saved = loadProgress(grade);
+    if (saved) {
+      State.stats = saved.stats || State.stats;
+      State.revealedCards = saved.revealedCards || {};
+      State.catchStats = saved.catchStats || {};
+      State.fixedResumeItems = saved.fixedResumeItems || {};
+      State._hasSavedProgress = true;
+    } else {
+      State._hasSavedProgress = false;
+    }
+    var ibw = $('impression-bar-wrap');
+    if (ibw) ibw.style.display = grade === 'senior' ? 'block' : 'none';
+    State.updateUI(); clearStage();
+    switch (grade) {
+      case 'freshman': startFreshman(); break;
+      case 'sophomore': startSophomore(); break;
+      case 'junior': startJunior(); break;
+      case 'senior': startSenior(); break;
+    }
+  } catch (e) {
+    var gs = $('game-stage');
+    if (gs) gs.innerHTML = '<div class=\"bg-red-50 rounded-xl p-4 text-red-600 text-sm\">Error: ' + e.message + '</div>';
+  }
+}
+
+// ==================== 音效 ====================
+var AudioFX = {
+  ctx: null,
+  init: function() { if (!this.ctx) try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} },
+  play: function(freq, dur, type, vol) {
+    try { this.init(); if (!this.ctx) return;
+      var o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type || 'sine'; o.frequency.value = freq;
+      g.gain.value = vol || 0.06;
+      g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+      o.connect(g); g.connect(this.ctx.destination);
+      o.start(); o.stop(this.ctx.currentTime + dur);
+    } catch(e) {}
+  },
+  click: function() { this.play(800, 0.06, 'sine', 0.04); },
+  ding: function() { this.play(1200, 0.1, 'sine', 0.07); },
+  success: function() { this.play(600, 0.12, 'sine', 0.07); var self = this; setTimeout(function() { self.play(900, 0.12, 'sine', 0.07); }, 100); },
+  fail: function() { this.play(200, 0.18, 'triangle', 0.05); },
+  tick: function() { this.play(1000, 0.04, 'sine', 0.03); },
+  buzzer: function() { this.play(150, 0.25, 'sawtooth', 0.04); }
+};
+
+document.addEventListener('click', function(e) {
+  var t = e.target;
+  if (t.closest('button') || t.closest('[onclick]') || t.closest('.flip-card') || t.closest('.resume-bad') || t.closest('.game-canvas')) {
+    AudioFX.click();
+  }
+}, true);
+
+// ############################################################################
+// 大一
+// ############################################################################
+var BG_DATA = [
+  {id:'wxg',name:'WXG 微信事业群',icon:'&#x1F4F1;',teaser:'连接十几亿人的超级App生态',detail:'微信、公众号、小程序、视频号——从通讯工具进化为覆盖社交、内容、支付、电商的超级生态。',jobs:[{t:'后台开发',d:'C++高并发分布式系统，消息路由、朋友圈Timeline、支付核心链路。'},{t:'产品经理(增长)',d:'用户增长漏斗分析，拉新-激活-留存-转化策略，AB实验驱动迭代。'}]},
+  {id:'ieg',name:'IEG 互动娱乐事业群',icon:'&#x1F3AE;',teaser:'全球最大游戏公司之一',detail:'王者荣耀、和平精英、Riot Games——自研+发行+投资，游戏全产业链覆盖。',jobs:[{t:'游戏引擎开发',d:'Unity/Unreal优化——渲染管线、物理引擎、网络同步。扎实C++和图形学。'},{t:'游戏策划(数值)',d:'核心玩法、经济系统、关卡设计——每个设计都用Excel建模验证数值。'}]},
+  {id:'csig',name:'CSIG 云与智慧产业',icon:'&#x2601;',teaser:'产业互联网核心阵地',detail:'腾讯云、企业微信、腾讯会议——帮银行数字化、帮工厂智能制造、帮政府智慧城市。',jobs:[{t:'云计算开发',d:'K8s、Serverless、分布式存储——深入理解操作系统和网络协议栈。'},{t:'To B产品经理',d:'理解企业业务流程和决策链，把降本增效翻译成产品功能。'}]},
+  {id:'teg',name:'TEG 技术工程事业群',icon:'&#x2699;',teaser:'鹅厂技术底座',detail:'AI大模型、大数据平台、推荐算法——几乎所有腾讯产品都建立在TEG之上。',jobs:[{t:'AI研究工程师',d:'LLM、多模态、CV前沿研究，NeurIPS/ICML顶会发表。扎实数学+PyTorch。'},{t:'芯片工程师',d:'自研AI芯片架构设计验证，软硬协同优化。体系结构和数字电路基础。'}]},
+  {id:'pcg',name:'PCG 平台与内容事业群',icon:'&#x1F4FA;',teaser:'内容与社交的超级平台',detail:'腾讯视频、QQ、腾讯文档——产品经理的黄埔军校。',jobs:[{t:'大前端开发',d:'亿级用户前端架构——SSR、性能优化、跨端方案。React/Vue/Node.js。'},{t:'产品经理(创作者)',d:'为UP主/博主设计从内容生产到变现的完整工具链。'}]},
+  {id:'cdg',name:'CDG 企业发展事业群',icon:'&#x1F4CA;',teaser:'商业与金融发动机',detail:'微信支付、理财通、广告营销、战略投资——让十几亿流量商业价值最大化。',jobs:[{t:'支付平台开发',d:'每日数十亿笔交易——一致性、可靠性、安全性。C++/Go。'},{t:'商业分析(BA)',d:'数据驱动战略决策——市场规模、竞争格局、新业务评估。SQL/Python+商业思维。'}]}
+];
+
+var SLANG_DATA = [
+  {term:'对齐',meaning:'确保团队成员对目标、方案、分工的理解一致。'},{term:'颗粒度',meaning:'描述事物的精细程度。"颗粒度太粗"=细节不够。'},{term:'闭环',meaning:'一件事从头到尾的完整链路。"形成商业闭环"=不只是有用户量，还能持续赚钱。'},{term:'赛道',meaning:'行业细分领域。"你为什么选这个赛道？"是面试高频题。'},{term:'赋能',meaning:'给业务/团队提供能力支持。别滥用——面试官最烦空洞的"赋能"。'},{term:'拉通',meaning:'把不同团队的信息和资源串联起来。大厂项目通常涉及3-5个团队。'},{term:'打法',meaning:'具体执行策略。"差异化打法"=和竞争对手有什么不同。'},{term:'底层逻辑',meaning:'事物最根本的运行规律。面试官最爱追问。'},{term:'复盘',meaning:'项目结束后系统性回顾——做了什么、结果如何、哪里可以改进。'},{term:'瑞雪文化',meaning:'腾讯内部社区——员工讨论技术、吐槽产品、分享生活。寓意开放、有温度。'},{term:'科技向善',meaning:'腾讯使命愿景——用科技解决社会问题。案例：腾讯觅影(AI医疗影像)。'},{term:'导师制',meaning:'校招生入职后有6个月一对一导师辅导——业界最好的培养制度之一。'},{term:'T型人才',meaning:'一项深入的专业能力+跨领域知识面。腾讯面试最看重的核心素质。'},{term:'Owner意识',meaning:'把项目当成自己的事来做——主动想怎么让整体更好。'},{term:'增量',meaning:'相比现有方案新增的价值。"你的项目有什么增量？"=你的贡献在哪里。'},{term:'痛点',meaning:'用户最难受、最需要解决的问题。产品经理面试必考题。'},{term:'MVP',meaning:'最小可行产品——用最小成本验证核心假设。腾讯推崇小步快跑。'},{term:'ROI',meaning:'投入产出比——你花了多少资源、换来了什么结果。面试官最常问的量化维度。'}
+];
+
+var GENE_KEYWORDS = [
+  {kw:['游戏','王者','LOL','电竞','原神','和平精英','打游戏','主机'],bg:'ieg',role:'游戏策划/运营',msg:'你对游戏的热爱本身就是最宝贵的竞争力。大一的你不需要马上会写代码——保持对游戏机制的好奇心，就是最好的准备。'},
+  {kw:['代码','编程','Python','C++','Java','写代码','开发','算法','AI','人工智能','机器学习'],bg:'teg',role:'AI/后台开发工程师',msg:'喜欢和代码打交道是件很酷的事。从Python或C++入门，先享受"用代码创造东西"的乐趣。'},
+  {kw:['沟通','社交','组织','策划','写文章','短视频','小红书','公众号','社群','活动'],bg:'pcg',role:'产品经理/内容运营',msg:'你天生擅长和人建立连接——这是产品经理最核心的素质。多观察身边的产品，保持对"人"的敏感。'},
+  {kw:['设计','画画','美术','Figma','PS','UI','配色','审美','摄影','视频剪辑'],bg:'pcg',role:'UI/UX设计师',msg:'你的审美sense是稀缺能力。从Figma入门，多逛Dribbble和Behance培养设计眼界。'},
+  {kw:['数据','数学','统计','Excel','SQL','分析','逻辑','推理'],bg:'cdg',role:'商业分析/数据科学家',msg:'逻辑和数据敏感度是AI时代最抗打的能力。打好数学和统计基础，学会用数据讲故事。'},
+  {kw:['创业','商业','赚钱','投资','股票','市场','营销','品牌','广告'],bg:'cdg',role:'商业分析/投资分析',msg:'商业sense是稀缺的软实力。多关注科技行业动态，读读财报和行业分析报告。'},
+  {kw:['云','服务器','Linux','网络','安全','黑客','CTF','运维','docker'],bg:'csig',role:'云计算/安全工程师',msg:'对底层技术的兴趣是非常稀缺的品质。从Linux命令行和计算机网络开始探索。'}
+];
+
+var _geneSelected = [];
+
+function startFreshman() {
+  State.roundIndex = 0;
+  if (!State._hasSavedProgress) { State.score = 0; State.revealedCards = {}; }
+  var resumeNote = State._hasSavedProgress ? ' (已恢复上次进度，已揭开' + Object.keys(State.revealedCards).length + '/6个BG)' : '';
+  setDialogue('大一新生你好！翻开BG盲盒了解业务版图 → 浏览鹅厂黑话字典 → 玩一把AI基因合成器。' + resumeNote);
+  renderFreshmanTabs('bg');
+}
+
+function renderFreshmanTabs(tab) {
+  var stage = $('game-stage');
+  var html = '<div class="flex gap-0 mb-3 bg-white rounded-xl p-1 shadow-sm border border-slate-100">';
+  html += '<button onclick="renderFreshmanTabs(\'bg\')" class="flex-1 py-2 text-xs rounded-lg tab-btn' + (tab === 'bg' ? ' active' : '') + '">BG盲盒</button>';
+  html += '<button onclick="renderFreshmanTabs(\'slang\')" class="flex-1 py-2 text-xs rounded-lg tab-btn' + (tab === 'slang' ? ' active' : '') + '">黑话字典</button>';
+  html += '<button onclick="renderFreshmanTabs(\'gene\')" class="flex-1 py-2 text-xs rounded-lg tab-btn' + (tab === 'gene' ? ' active' : '') + '">基因合成器</button>';
+  html += '</div>';
+
+  if (tab === 'bg') {
+    var rc = Object.keys(State.revealedCards).length;
+    html += '<div class="grid grid-cols-2 md:grid-cols-3 gap-3">';
+    BG_DATA.forEach(function(bg, i) {
+      var r = State.revealedCards[i] === true;
+      html += '<div class="flip-card' + (r ? ' flipped' : '') + '" id="flip-' + i + '"' + (r ? '' : ' onclick="revealCard(' + i + ')" style="cursor:pointer"') + ' tabindex="0" role="button" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();revealCard(' + i + ');}">';
+      html += '<div class="flip-card-inner"><div class="flip-card-front"><div class="text-3xl mb-1">' + bg.icon + '</div><div class="font-bold text-sm text-slate-700">' + bg.name.split(' ')[0] + '</div><div class="text-xs text-slate-400 mt-0.5">点击揭开</div></div>';
+      html += '<div class="flip-card-back text-sm text-left"><div class="font-bold mb-1 text-base">' + bg.name + '</div><div class="text-xs text-blue-100 mb-1">' + bg.teaser + '</div><div class="text-xs text-blue-200 leading-relaxed">' + bg.detail + '</div></div></div></div>';
+    });
+    html += '</div>';
+    $('action-area').innerHTML = '<div class="text-center text-xs text-slate-400" id="bg-progress-text">已揭开 ' + rc + '/6</div>';
+  } else if (tab === 'slang') {
+    html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-2">';
+    SLANG_DATA.forEach(function(s) {
+      html += '<div class="bg-white rounded-xl p-3 shadow-sm border border-slate-100"><div class="font-bold text-sm text-blue-700 mb-1">"' + s.term + '"</div><div class="text-xs text-slate-500 leading-relaxed">' + s.meaning + '</div></div>';
+    });
+    html += '</div>';
+    State.addStat('awareness', 8); State.updateUI();
+    $('action-area').innerHTML = '<div class="text-xs text-slate-400 text-center">了解鹅厂独特文化语言，面试中不经意间提到会很加分</div>';
+  } else if (tab === 'gene') {
+    html += '<div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100"><div class="font-bold text-sm text-slate-800 mb-2">AI 岗位基因合成器</div><p class="text-xs text-slate-500 mb-3">选3个最像你的兴趣标签，AI为你的DNA匹配最适合的鹅厂岗位！</p><div class="flex flex-wrap gap-1.5 mb-3" id="gene-tags">';
+    var allTags = ['打游戏','写代码','跟人沟通','组织活动','画画设计','做视频','数据分析','研究商业','捣鼓服务器','写文章','搞创业','研究AI'];
+    allTags.forEach(function(t) {
+      html += '<span class="px-2 py-1 rounded-full text-xs cursor-pointer border transition-all hover:shadow-sm" style="border-color:#cbd5e1;color:#475569;" onclick="toggleGeneTag(this,\'' + t + '\')">' + t + '</span>';
+    });
+    html += '</div><div class="text-xs text-slate-400 mb-2">已选: <span id="gene-selected-count">0</span>/3</div><button onclick="runGeneSynthesis()" id="btn-gene-run" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm" disabled>开始AI基因合成</button><div id="gene-result" class="mt-3"></div></div>';
+    $('action-area').innerHTML = '';
+  }
+  stage.innerHTML = html;
+  if (tab === 'gene') { _geneSelected = []; }
+}
+
+function revealCard(i) {
+  var card = $('flip-' + i);
+  if (!card || card.classList.contains('flipped')) return;
+  card.classList.add('flipped');
+  State.revealedCards[i] = true;
+  State.score++;
+  State.addStat('awareness', 12); State.updateUI(); saveProgress();
+  var rc = Object.keys(State.revealedCards).length;
+  var pt = $('bg-progress-text');
+  if (pt) pt.textContent = '已揭开 ' + rc + '/6';
+  if (rc >= 6) {
+    $('action-area').innerHTML = '<div class="text-center text-xs text-slate-400" id="bg-progress-text">已揭开 6/6</div>';
+  }
+}
+
+function toggleGeneTag(el, tag) {
+  var idx = _geneSelected.indexOf(tag);
+  if (idx >= 0) { _geneSelected.splice(idx, 1); el.style.borderColor = '#cbd5e1'; el.style.color = '#475569'; el.style.background = ''; }
+  else { if (_geneSelected.length >= 3) return; _geneSelected.push(tag); el.style.borderColor = '#0052D9'; el.style.color = '#0052D9'; el.style.background = '#eff6ff'; }
+  $('gene-selected-count').textContent = _geneSelected.length;
+  var btn = $('btn-gene-run'); if (btn) btn.disabled = _geneSelected.length === 0;
+}
+
+function runGeneSynthesis() {
+  if (_geneSelected.length === 0) return;
+  var btn = $('btn-gene-run');
+  if (btn) { btn.disabled = true; btn.textContent = 'AI基因合成中...'; btn.style.background = 'linear-gradient(90deg,#0052D9,#60a5fa,#0052D9)'; btn.style.backgroundSize = '200% 100%'; }
+  setTimeout(function() {
+    var scores = {};
+    GENE_KEYWORDS.forEach(function(g) { scores[g.bg + ':' + g.role] = 0; });
+    _geneSelected.forEach(function(tag) {
+      var tl = tag.toLowerCase();
+      GENE_KEYWORDS.forEach(function(g) {
+        for (var i = 0; i < g.kw.length; i++) {
+          if (tl.indexOf(g.kw[i].toLowerCase()) >= 0 || g.kw[i].toLowerCase().indexOf(tl) >= 0) {
+            scores[g.bg + ':' + g.role] += 1;
+          }
+        }
+      });
+    });
+    var best = null, bestScore = 0;
+    Object.keys(scores).forEach(function(k) { if (scores[k] > bestScore) { bestScore = scores[k]; best = k; } });
+    if (!best || bestScore === 0) best = 'ieg:游戏策划/运营';
+    var parts = best.split(':'), bgId = parts[0], roleName = parts[1], bgName = '';
+    BG_DATA.forEach(function(b) { if (b.id === bgId) bgName = b.name; });
+    var msg = '';
+    GENE_KEYWORDS.forEach(function(g) { if (g.role === roleName) msg = g.msg; });
+    var res = $('gene-result');
+    if (res) res.innerHTML = '<div class="rounded-xl p-5 text-center" style="animation:popIn 0.4s ease forwards;background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:1px solid #bfdbfe;"><div class="text-3xl mb-2">&#x1F9EC;</div><div class="font-bold text-slate-800 mb-1">AI 基因合成完成!</div><div class="text-sm text-slate-700 mb-2">根据你的兴趣标签匹配：</div><div class="inline-block px-3 py-1.5 rounded-full text-sm font-bold text-white mb-2" style="background:#0052D9;">' + bgName + ' - ' + roleName + '</div><div class="text-xs text-slate-500 italic leading-relaxed mt-2">"' + msg + '"</div></div>';
+    if (btn) { btn.textContent = '重新合成'; btn.disabled = false; btn.style.background = ''; btn.style.backgroundSize = ''; }
+    State.addStat('awareness', 15); State.addStat('readiness', 8); State.updateUI();
+  }, 2000);
+}
+
+// ############################################################################
+// 大二
+// ############################################################################
+var GOOD_ITEMS = [
+  {l:'Python',ico:'&#x1F40D;',pts:10,cat:'tech'},{l:'LeetCode',ico:'&#x1F4BB;',pts:10,cat:'tech'},{l:'GitHub绿墙',ico:'&#x2B50;',pts:12,cat:'tech'},{l:'系统设计',ico:'&#x1F3D7;',pts:15,cat:'tech'},{l:'Linux',ico:'&#x1F427;',pts:10,cat:'tech'},{l:'Docker/K8s',ico:'&#x1F4E6;',pts:12,cat:'tech'},{l:'数据结构',ico:'&#x1F4CA;',pts:12,cat:'tech'},{l:'SQL调优',ico:'&#x1F4C8;',pts:10,cat:'tech'},{l:'竞品分析',ico:'&#x1F50D;',pts:12,cat:'product'},{l:'用户调研',ico:'&#x1F4CB;',pts:12,cat:'product'},{l:'PRD写作',ico:'&#x1F4DD;',pts:12,cat:'product'},{l:'数据分析',ico:'&#x1F4CA;',pts:12,cat:'product'},{l:'行业报告',ico:'&#x1F4CA;',pts:10,cat:'product'},{l:'AB实验',ico:'&#x2696;',pts:15,cat:'product'},{l:'作品集打磨',ico:'&#x1F3A8;',pts:12,cat:'design'},{l:'Figma原型',ico:'&#x1F4C4;',pts:12,cat:'design'},{l:'设计规范',ico:'&#x1F4D0;',pts:12,cat:'design'},{l:'交互原型',ico:'&#x1F504;',pts:12,cat:'design'},{l:'用户测试',ico:'&#x1F465;',pts:10,cat:'design'}
+];
+var BAD_ITEMS = [
+  {l:'通宵上分',ico:'&#x1F3AE;',pts:-15},{l:'盲目焦虑',ico:'&#x1F630;',pts:-10},{l:'无效刷剧',ico:'&#x1F4FA;',pts:-10},{l:'攀比实习',ico:'&#x1F4A8;',pts:-15},{l:'收藏=学了',ico:'&#x1F516;',pts:-10},{l:'简历造假',ico:'&#x274C;',pts:-20},{l:'面经硬背',ico:'&#x1F4D6;',pts:-10},{l:'无目的水群',ico:'&#x1F4AC;',pts:-10}
+];
+var GOLDEN_ITEMS = [
+  {l:'开源PR合入',ico:'&#x1F389;',pts:30},{l:'拿到实习Offer',ico:'&#x1F381;',pts:30},{l:'项目上线了',ico:'&#x1F680;',pts:30}
+];
+
+function startSophomore() {
+  State.roundIndex = 0; State.score = 0; State.sophomorePhase = 0;
+  State.catchStats = {tech:0, product:0, design:0, trap:0, golden:0};
+  var note = '';
+  if (State._hasSavedProgress) {
+    var cs = State.catchStats;
+    var total = cs.tech + cs.product + cs.design + cs.golden;
+    if (total > 0) note = ' 检测到上次游戏数据（有效技能' + total + '个），重新开始将覆盖。';
+  }
+  setDialogue('大二是技能修炼的黄金期。来玩一局接接乐——控制小企鹅接住值得投入的技能，避开伪努力陷阱。限时25秒！' + note);
+  renderSophomoreStage();
+}
+
+function renderSophomoreStage() {
+  $('game-stage').innerHTML = '<div class="text-center mb-2 flex justify-between items-center px-2"><span class="text-sm font-bold text-slate-600">得分: <span id="catch-score" class="text-green-600">0</span></span><span class="text-sm font-bold text-slate-600">倒计时: <span id="catch-timer" class="text-blue-600">25</span>s</span></div><div class="game-canvas relative mx-auto" id="catch-canvas" style="width:100%;height:380px;" tabindex="0" aria-label="技能接接乐游戏区"><div class="penguin" id="penguin" style="width:56px;text-align:center;font-size:40px;line-height:1;">&#x1F427;</div></div>';
+  $('action-area').innerHTML = '<p class="text-xs text-slate-400 text-center">拖动企鹅或键盘方向键接住技能 | 红色左边缘=陷阱 金色左边缘=稀有奖励</p><button id="btn-start-catch" onclick="startCatchGame()" class="w-full py-3 bg-green-500 hover:bg-green-400 text-white font-medium rounded-xl transition-all text-sm">开始接接乐 (25秒)</button>';
+}
+
+function startCatchGame() {
+  if (State.gameRunning) return;
+  State.gameRunning = true; State.score = 0;
+  State.catchStats = {tech:0, product:0, design:0, trap:0, golden:0};
+  var btn = $('btn-start-catch'); if (btn) btn.style.display = 'none';
+  var se = $('catch-score'); if (se) se.textContent = '0';
+  var canvas = $('catch-canvas'), penguin = $('penguin');
+  if (!canvas || !penguin) return;
+  var timeLeft = 25, self = State;
+  var penguinX = (canvas.getBoundingClientRect().width - 56) / 2;
+  penguin.style.transform = 'translateX(' + penguinX + 'px)';
+
+  var timerId = setInterval(function() {
+    timeLeft--;
+    var ct = $('catch-timer'); if (ct) ct.textContent = timeLeft;
+    if (timeLeft <= 5 && ct) { AudioFX.tick(); ct.classList.add('urgent-pulse'); ct.classList.add('text-red-500'); }
+    if (timeLeft <= 0) endCatchGame();
+  }, 1000);
+  State.addTimer(timerId);
+
+  // 键盘控制
+  function onKey(e) {
+    if (!self.gameRunning) return;
+    var step = 30;
+    if (e.key === 'ArrowLeft') penguinX = Math.max(0, penguinX - step);
+    else if (e.key === 'ArrowRight') penguinX = Math.min(canvas.getBoundingClientRect().width - 56, penguinX + step);
+    else return;
+    penguin.style.transform = 'translateX(' + penguinX + 'px)';
+    e.preventDefault();
+  }
+  document.addEventListener('keydown', onKey);
+  State.addListener(document, 'keydown', onKey);
+
+  // 掉落物
+  var activeItems = [];
+  function spawnItem() {
+    if (!self.gameRunning) return;
+    var rand = Math.random();
+    var pool = rand < 0.08 ? GOLDEN_ITEMS : (rand < 0.45 ? BAD_ITEMS : GOOD_ITEMS);
+    var item = pool[Math.floor(Math.random() * pool.length)];
+    var cat = item.cat || (pool === BAD_ITEMS ? 'trap' : (pool === GOLDEN_ITEMS ? 'golden' : 'tech'));
+    var el = document.createElement('div');
+    el.className = 'fall-item' + (cat === 'trap' ? ' trap-hint' : '') + (cat === 'golden' ? ' golden-hint' : '');
+    el.style.left = (5 + Math.random() * 80) + '%';
+    el.style.top = '-60px';
+    el.style.animationDuration = (2.5 + Math.random() * 2.5) + 's';
+    el.innerHTML = '<span class="text-xs font-bold">' + item.l + '</span>';
+    el.dataset.cat = cat;
+    el.dataset.pts = item.pts;
+    canvas.appendChild(el);
+    activeItems.push(el);
+
+    el.addEventListener('animationend', function() {
+      var idx = activeItems.indexOf(el);
+      if (idx >= 0) activeItems.splice(idx, 1);
+      if (el.parentNode) el.remove();
+    });
+
+    if (self.gameRunning) setTimeout(spawnItem, 500 + Math.random() * 700);
+  }
+  setTimeout(spawnItem, 300);
+
+  // rAF碰撞检测
+  function collisionLoop() {
+    if (!self.gameRunning) { activeItems = []; return; }
+    var pRect = penguin.getBoundingClientRect();
+    for (var i = activeItems.length - 1; i >= 0; i--) {
+      var el = activeItems[i];
+      if (!el || !el.parentNode) { activeItems.splice(i, 1); continue; }
+      var eRect = el.getBoundingClientRect();
+      if (eRect.bottom >= pRect.top && eRect.left < pRect.right && eRect.right > pRect.left && eRect.top < pRect.bottom) {
+        var cat = el.dataset.cat;
+        if (cat === 'trap') { self.score = Math.max(0, self.score + parseInt(el.dataset.pts)); el.style.background = '#fee2e2'; self.catchStats.trap++; AudioFX.fail(); }
+        else if (cat === 'golden') { self.score += parseInt(el.dataset.pts); el.style.background = '#fef3c7'; self.catchStats.golden++; AudioFX.success(); }
+        else { self.score += parseInt(el.dataset.pts); self.catchStats[cat] = (self.catchStats[cat] || 0) + 1; AudioFX.ding(); }
+        el.style.transform = 'scale(1.3)';
+        var se2 = $('catch-score'); if (se2) se2.textContent = self.score;
+        activeItems.splice(i, 1);
+        setTimeout(function() { if (el.parentNode) el.remove(); }, 150);
+      }
+    }
+    requestAnimationFrame(collisionLoop);
+  }
+  requestAnimationFrame(collisionLoop);
+
+  // 触控/鼠标
+  function movePenguin(clientX) {
+    var rect = canvas.getBoundingClientRect();
+    penguinX = Math.max(0, Math.min(rect.width - 56, clientX - rect.left - 28));
+    penguin.style.transform = 'translateX(' + penguinX + 'px)';
+  }
+  function onMouseMove(e) { if (!self.gameRunning) return; movePenguin(e.clientX); }
+  function onMouseDown(e) { if (self.gameRunning) { movePenguin(e.clientX); document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp); } }
+  function onMouseUp() { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); }
+  function onTouchMove(e) { if (!self.gameRunning) return; e.preventDefault(); movePenguin(e.touches[0].clientX); }
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('touchstart', onTouchMove);
+  canvas.addEventListener('touchmove', onTouchMove, {passive: false});
+  State.addListener(canvas, 'mousedown', onMouseDown);
+  State.addListener(canvas, 'touchstart', onTouchMove);
+  State.addListener(canvas, 'touchmove', onTouchMove, {passive: false});
+}
+
+function endCatchGame() {
+  State.gameRunning = false; State.clearAllTimers(); State.clearAllListeners();
+  var canvas = $('catch-canvas');
+  if (canvas) canvas.innerHTML = '<div class="flex items-center justify-center h-full"><div class="text-center"><div class="text-5xl mb-2">&#x1F427;</div><p class="text-slate-500 text-sm">游戏结束，正在生成技能雷达图...</p></div></div>';
+  State.addStat('competency', Math.min(35, Math.floor(State.score / 10)));
+  State.addStat('selfDrive', Math.floor(State.score / 5));
+  State.updateUI(); saveProgress();
+  setTimeout(function() { renderRadarChart(); }, 800);
+}
+
+function getSkillScore() {
+  var cs = State.catchStats;
+  return cs.tech * 10 + cs.product * 10 + cs.design * 10 + cs.golden * 30;
+}
+
+function renderRadarChart() {
+  var stage = $('game-stage'), cs = State.catchStats;
+  var totalGood = cs.tech + cs.product + cs.design + cs.golden;
+  var totalBad = cs.trap;
+  var techPct = totalGood > 0 ? Math.round(cs.tech / totalGood * 100) : 0;
+  var prodPct = totalGood > 0 ? Math.round(cs.product / totalGood * 100) : 0;
+  var desPct = totalGood > 0 ? Math.round(cs.design / totalGood * 100) : 0;
+  var skillScore = getSkillScore();
+
+  var html = '<div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100"><div class="font-bold text-sm text-slate-800 mb-3">技能雷达图 & AI诊断书</div><div class="space-y-2 mb-4">';
+  [{l:'技术力',v:techPct,c:'#10b981'},{l:'产品力',v:prodPct,c:'#2563eb'},{l:'设计力',v:desPct,c:'#db2777'}].forEach(function(b) {
+    html += '<div class="flex items-center gap-2"><span class="text-xs w-12 text-slate-600">' + b.l + '</span><div class="flex-1 stat-bar-bg"><div class="stat-bar-fill" style="width:' + b.v + '%;background:' + b.c + ';"></div></div><span class="text-xs text-slate-500 w-8 text-right">' + b.v + '%</span></div>';
+  });
+  html += '</div>';
+
+  var diag = '', evalLabel = '';
+  if (skillScore >= 120) { evalLabel = '大神级'; diag = '你的硬核技能点已经拉满，青云计划在向你招手。建议立刻越级体验大三简历急诊室！'; }
+  else if (skillScore >= 60) { evalLabel = '进阶型'; diag = '技能结构比较均衡。继续把得分最高的方向做深——面试官最喜欢T型人才。'; }
+  else if (skillScore >= 20) { evalLabel = '入门型'; diag = '有一定基础但覆盖面还不够。大二最怕伪努力——收藏很多但没有真正深入。建议聚焦一个方向猛攻。'; }
+  else { evalLabel = '萌芽型'; diag = '大二最容易陷入"战术上的勤奋"。你接住了太多陷阱，考一堆不相关的证书不如扎实写好一个项目。'; }
+  if (totalBad > totalGood * 0.5) { diag += ' 特别提醒：成长陷阱太多——有些事做一百件也不如扎扎实实做好一件事。'; }
+
+  html += '<div class="rounded-lg p-3 text-xs leading-relaxed" style="background:#f0fdf4;color:#15803d;"><span class="font-bold">AI诊断 [' + evalLabel + '] (技能分:' + skillScore + ')：</span>' + diag + '</div>';
+  html += '<div class="flex flex-wrap gap-3 mt-3 text-xs text-slate-400"><span>技术力:' + cs.tech + '个</span><span>产品力:' + cs.product + '个</span><span>设计力:' + cs.design + '个</span><span>稀有:' + cs.golden + '个</span><span>陷阱:' + cs.trap + '个</span></div></div>';
+  stage.innerHTML = html;
+  $('action-area').innerHTML = '<button onclick="backToEntry()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm">返回首页</button>' + linkBtn('带着技能雷达，直通官网看看实习岗位');
+  showCompleteModal('&#x1F4AA;', '技能接接乐+雷达图生成!', '技能分:' + skillScore + ' | ' + evalLabel + '\n' + diag);
+}
+
+// ############################################################################
+// 大三
+// ############################################################################
+var RESUME_ROLES = {
+  tech_backend: {name:'技术-后台开发',icon:'&#x1F4BB;',intro:'后台开发简历重点：高并发系统经验、技术栈深度、量化性能指标。',fixes:[{bad:'用Spring Boot写过一个管理系统',good:'独立设计并实现高并发秒杀系统(Spring Boot+Redis+Kafka)，QPS峰值8000+、订单一致性99.99%。GitHub 200+ star',spot:'没有量化指标，没有架构描述'},{bad:'负责公司官网后端开发',good:'主导从0到1搭建官网后端服务(Go+Gin+MySQL)，设计RESTful API 20+，JWT鉴权+RBAC权限+API限流。日均50万+请求，可用性99.9%',spot:'"负责XX开发"太模糊——没有技术栈、没有规模指标'},{bad:'对MySQL和Redis有所了解',good:'深入理解MySQL(InnoDB/B+Tree/执行计划分析，3s+慢查询优化至50ms)；Redis(缓存穿透/击穿/雪崩方案、分布式锁，QPS 20000+)',spot:'"有所了解"是简历黑洞——没写懂了什么原理、解决了什么问题'}]},
+  tech_frontend: {name:'技术-前端开发',icon:'&#x1F4BB;',intro:'前端简历重点：项目复杂度、性能优化案例、工程化能力。',fixes:[{bad:'用Vue做了一个电商网站的前端页面',good:'独立开发电商SPA(Vue3+TS+Pinia)，虚拟滚动(万级数据流畅渲染)、图片懒加载(LCP 4.2s降至1.1s)、Vite构建+打包体积优化至原始40%',spot:'"做了页面"太浅——没有性能数据、没有工程化方案'},{bad:'了解HTML、CSS和JavaScript',good:'精通HTML5语义化/CSS3(Flexbox+Grid+BEM命名规范)；深入JS(原型链/闭包/事件循环/Promise原理)；TS在生产项目中实际使用',spot:'"了解"太虚——没写真正掌握到什么深度'}]},
+  product_strategy: {name:'产品-策略产品',icon:'&#x1F4CB;',intro:'策略产品简历重点：数据驱动决策、实验设计、策略框架。',fixes:[{bad:'分析过某App的用户增长情况',good:'深度分析某社交App用户增长漏斗(SQL提取埋点数据N=50万)，发现激活→首日留存仅35%(行业基准55%)，定位3个关键流失点，预估优化后留存可提升20pp',spot:'"分析过"太空洞——数据规模、分析方法、发现结论都没写'},{bad:'做了一个校园二手交易小程序的产品方案',good:'从0到1发起校园二手交易小程序：150份问卷+15场访谈→7个核心功能(MoSCoW)→5轮可用性测试迭代→上线3月5000+用户/3000+订单/复购率42%/客单价+25%',spot:'方案≠画原型——完整链路是调研→优先级→原型→测试→上线→数据'}]},
+  design_ux: {name:'设计-体验设计',icon:'&#x1F3A8;',intro:'设计简历重点：全链路设计能力、设计方法论、商业理解。',fixes:[{bad:'帮社团做过海报和宣传物料',good:'为5个社团提供品牌视觉设计：建立统一规范(配色+字体+组件库，效率+60%)，30+张海报(活动到场率+25%，A/B测试验证)。"校园音乐节"系列在站酷获10K+浏览',spot:'免费设计也能体现专业度——方法论+体系化+量化效果'},{bad:'做过App界面的Redesign',good:'深度Redesign某新闻App：竞品分析(5款)+用户访谈(N=20)→信息层级3层改2层→暗色转柔和阅读色→AB测试：阅读时长+22%，收藏率+15%',spot:'Redesign价值不在于图好看，在于发现问题→推导→验证效果'}]}
+};
+
+var TRANSLATOR_SAMPLES = [
+  {before:'组织了学校的校园歌手大赛，负责拉赞助和安排场地，最后活动办得很成功。',after:'作为项目主理人，统筹5人团队策划并执行校园歌手大赛(到场观众2000+)。主导商务谈判获取3家品牌赞助(总金额1.5万元)。通过私域社群+短视频预热实现活动曝光10万+。观众满意度4.6/5.0，获校方"年度最佳校园活动"。',tip:'"办得很成功"→具体人数+金额+满意度。每个数字都在证明你的执行力。'},
+  {before:'在导师实验室帮忙做了一些数据分析的工作，主要就是用Python跑了一些模型，最后写了一篇论文。',after:'独立完成"基于深度学习的XX疾病预测模型"研究：清洗并标注10万+条临床数据(Python/NumPy/Pandas)，对比3种模型架构(ResNet/DenseNet/EfficientNet)性能，将诊断准确率从82%提升至93%(+11pp)。成果发表于CCF-B类会议(第二作者)，论文已被引用15次+。',tip:'"帮忙做了一些"→独立完成+数据规模+技术方案对比+量化提升+发表成果。'},
+  {before:'暑假在一家小公司实习，做了一些杂七杂八的事情，包括整理数据、帮同事做报表、偶尔写写文档。',after:'暑期实习期间(XX科技有限公司，2个月)，主动发现数据报表手工处理效率低的问题(每次耗时3h+)，开发Python自动化脚本将报表生成时间从3小时缩短至15分钟(效率提升12倍)。编写团队新人onboarding文档(累计5000+字)，被部门负责人采纳为准入培训材料。',tip:'"杂七杂八"→发现问题的主动意识+自动化方案+量化效率提升+文档影响力。'},
+  {before:'作为社团负责人，管理社团的各项事务，包括招新、组织活动和财务管理。',after:'担任XX社团社长(任期1年，团队30人)，建立结构化招新流程(线上宣讲+笔试+3轮面试，候选人转化率40%→68%)。策划5场主题活动(平均到场150+人，满意度4.5/5.0)。管理社团年度预算(2万元)，实现活动赞助收入同比增长60%。',tip:'"管理各项事务"→拆解为具体模块(招新/活动/财务)+每个模块有量化成果。'}
+];
+
+function startJunior() {
+  State.roundIndex = 0; State.score = 0; State.fixedResumeItems = {}; State.juniorRole = null;
+  setDialogue('大三了，简历是HR认识你的第一张名片。先选目标岗位：');
+  renderJuniorRoleSelect();
+}
+
+function renderJuniorRoleSelect() {
+  var roles = [{k:'tech_backend',n:'技术-后台开发'},{k:'tech_frontend',n:'技术-前端开发'},{k:'product_strategy',n:'产品-策略产品'},{k:'design_ux',n:'设计-体验设计'}];
+  var html = '<div class="grid grid-cols-2 gap-2">';
+  roles.forEach(function(r) {
+    var rd = RESUME_ROLES[r.k];
+    html += '<div onclick="selectJuniorRole(\'' + r.k + '\')" class="bg-white rounded-xl p-3 shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-all"><span class="text-lg">' + rd.icon + '</span><div class="font-bold text-xs text-slate-800 mt-1">' + r.n + '</div></div>';
+  });
+  html += '</div>';
+  $('game-stage').innerHTML = html;
+  $('action-area').innerHTML = '';
+}
+
+function selectJuniorRole(role) {
+  State.juniorRole = role; State.score = 0; State.fixedResumeItems = {};
+  var rd = RESUME_ROLES[role];
+  setDialogue('点击红色虚线的"雷区"，AI立刻告诉你问题在哪并直接替换为专业表述！');
+  renderJuniorFindStage();
+}
+
+function renderJuniorFindStage() {
+  var stage = $('game-stage'), rd = RESUME_ROLES[State.juniorRole], fixes = rd.fixes;
+  var fixedCount = Object.keys(State.fixedResumeItems).filter(function(k) { return State.fixedResumeItems[k] === 'fixed'; }).length;
+  var html = '<div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100 text-sm leading-relaxed text-slate-700"><div class="text-center mb-4"><div class="font-black text-lg text-slate-800">求职简历</div><div class="text-xs text-slate-400">应聘：' + rd.name + ' | 大三 | XX大学</div></div><div class="mb-2"><span class="font-bold">项目与经历 (点击红色虚线直接修复)</span></div><ul class="space-y-2 mb-4">';
+  fixes.forEach(function(fix, i) {
+    var isFixed = State.fixedResumeItems[i] === 'fixed';
+    html += '<li class="flex items-start gap-2"><span class="text-slate-300">&#x2022;</span>';
+    if (isFixed) { html += '<span class="resume-bad fixed">' + fix.good + '</span><span class="text-green-500 text-xs mt-0.5">&#x2714;</span>'; }
+    else { html += '<span class="resume-bad" id="bad-' + i + '" onclick="fixResumeIssue(' + i + ')">' + fix.bad + '</span><span class="text-xs text-red-400 mt-0.5 cursor-pointer" onclick="fixResumeIssue(' + i + ')">点击修复</span>'; }
+    html += '</li>';
+  });
+  html += '</ul></div>';
+  stage.innerHTML = html;
+  $('action-area').innerHTML = '<div class="text-center text-xs text-slate-400" id="resume-fix-count">已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')</div>' + (fixedCount >= fixes.length ? '<button onclick="startTranslator()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-2">第一关通关！进入项目翻译机</button>' : '');
+}
+
+function fixResumeIssue(i) {
+  if (State.fixedResumeItems[i] === 'fixed') return;
+  var rd = RESUME_ROLES[State.juniorRole];
+  State.fixedResumeItems[i] = 'fixed';
+  State.score += 2;
+  State.addStat('competency', 10); State.addStat('readiness', 8); State.updateUI(); saveProgress();
+  var el = $('bad-' + i);
+  if (el) { el.classList.add('fixed'); el.textContent = rd.fixes[i].good; el.onclick = null; }
+  setDialogue('修复完成！雷区：' + rd.fixes[i].spot + '\n\n修改后：' + rd.fixes[i].good);
+  var fixedCount = Object.keys(State.fixedResumeItems).filter(function(k) { return State.fixedResumeItems[k] === 'fixed'; }).length;
+  var cntEl = $('resume-fix-count'), fixes = rd.fixes;
+  if (cntEl) {
+    cntEl.textContent = '已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')';
+    if (fixedCount >= fixes.length) {
+      cntEl.parentNode.innerHTML = '<div class="text-center text-xs text-slate-400">已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')</div><button onclick="startTranslator()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-2">第一关通关！进入项目翻译机</button>';
+    }
+  }
+}
+
+function startTranslator() {
+  clearStage();
+  var sample = TRANSLATOR_SAMPLES[Math.floor(Math.random() * TRANSLATOR_SAMPLES.length)];
+  State._translatorSample = sample;
+  State._translatorRunning = false;
+  setDialogue('第二关：项目翻译机！一个普通的校园活动经历，怎么写才能让面试官眼前一亮？');
+  var stage = $('game-stage');
+  stage.innerHTML = '<div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100"><div class="font-bold text-sm text-slate-800 mb-3">项目翻译机</div><div class="mb-4"><span class="text-xs font-bold text-red-500">翻译前 (学生思维)：</span><div class="bg-red-50 rounded-lg p-3 text-xs text-slate-600 mt-1 leading-relaxed" id="translator-before">' + sample.before + '</div></div><div class="mb-3"><span class="text-xs font-bold text-green-500">翻译后 (STAR法则)：</span><div class="bg-green-50 rounded-lg p-3 text-xs text-slate-600 mt-1 leading-relaxed" id="translator-after" style="min-height:60px;"></div></div><div class="rounded-lg p-2 text-xs" style="background:#fef3c7;color:#92400e;" id="translator-tip"></div><div id="translator-actions" class="mt-3"></div></div>';
+  $('action-area').innerHTML = '<button onclick="runTranslator()" id="btn-translator" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm">AI 翻译这段经历</button>';
+}
+
+function runTranslator() {
+  if (State._translatorRunning) return;
+  State._translatorRunning = true;
+  var btn = $('btn-translator');
+  if (btn) { btn.disabled = true; btn.textContent = 'AI翻译中...'; }
+  var after = $('translator-after'), tip = $('translator-tip'), ta = $('translator-actions');
+  if (after) after.textContent = ''; if (tip) tip.textContent = ''; if (ta) ta.innerHTML = '';
+  var sample = State._translatorSample || TRANSLATOR_SAMPLES[0];
+  var text = sample.after;
+  var i = 0;
+  State.clearAllTimers();
+  var tId = setInterval(function() {
+    if (after) after.textContent += text[i]; i++;
+    if (i >= text.length) {
+      clearInterval(tId);
+      State._translatorRunning = false;
+      if (tip) tip.textContent = '翻译提示：' + sample.tip;
+      if (btn) { btn.textContent = '刷新一个例子'; btn.disabled = false; }
+      State.addStat('readiness', 12); State.updateUI(); saveProgress();
+      if (ta) ta.innerHTML = '<button onclick="showTranslatorSummary()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-3">查看通关总结</button>' + linkBtn('带着STAR法则，直通官网投递');
+    }
+  }, 30);
+  State.addTimer(tId);
+}
+
+function showTranslatorSummary() {
+  showCompleteModal('&#x1F4DD;', '简历急诊室通关!', '找茬+翻译双模式完成\n求职成熟度显著提升\n\nSTAR法则核心：每个项目经历都要有\n情境-任务-行动-结果的完整链路和量化数据。');
+  $('action-area').innerHTML = '<button onclick="backToEntry()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm">返回首页</button>' + linkBtn('带着STAR法则，直通官网投递');
+}
+
+// ############################################################################
+// 大四
+// ############################################################################
+var INTERVIEW_QUESTIONS = [
+  {q:'面试官：「请介绍你最有挑战性的一个项目，以及你在其中的具体贡献。」(专业面)',opts:[{t:'用STAR法则展开：项目背景和你的角色→技术方案与决策理由→量化成果→复盘反思。',s:25,f:'教科书级！面试官想看的是你的思维过程。'},{t:'把简历上的项目描述重复一遍，补充说"团队一起做的"',s:3,f:'回避了"你的贡献是什么"。'},{t:'选最简单的项目详细讲技术实现，但没提量化成果',s:12,f:'技术细节不错但缺量化。'},{t:'先讲背景和Why，再讲方案，最后用具体数字总结成果',s:22,f:'完整！多讲技术决策的tradeoff会更有深度。'}]},
+  {q:'面试官：「你和leader在方案上有严重分歧，怎么处理？」(行为面试)',opts:[{t:'梳理双方核心差异和数据支撑，带着分析去沟通。如果leader有我没考虑的视角就接受。如我认为自己方案更好，请求AB测试验证。',s:25,f:'展示了成熟冲突处理。'},{t:'leader说什么就做什么，完全不反驳',s:5,f:'缺乏独立思考。'},{t:'坚持己见，找更高级别来评理',s:3,f:'越级汇报是职场大忌。'},{t:'约leader 1v1深聊，听完对方思路再表达观点',s:20,f:'沟通意愿好。补充数据验证更佳。'}]},
+  {q:'面试官：「你为什么想加入腾讯？对我们的哪个产品最感兴趣？」(动机)',opts:[{t:'真诚分享对某个具体产品的深度思考——做对了什么、可改进什么、你来做会从哪入手。同时说明自己为什么和这个方向匹配。',s:25,f:'做了功课+有独立洞察+思考"我能贡献什么"。'},{t:'因为腾讯是大厂，平台大、福利好、能学到东西',s:3,f:'太泛了，中心是"我能得到什么"。'},{t:'用准备的套话模板，一套完美的标准答案',s:8,f:'模板痕迹太重。'},{t:'结合大学使用腾讯产品的真实体验讲有温度的故事',s:22,f:'真实体验引入很加分！升级到产品视角更精彩。'}]},
+  {q:'面试官：「估算一下深圳市一天有多少个外卖订单。」(费米问题)',opts:[{t:'先拆解：深圳人口1800万→外卖用户渗透率→使用频次(工作日vs周末)→分场景估算。主动说明假设并标注不确定性。',s:25,f:'费米问题核心不是算对，是拆解逻辑是否自洽。'},{t:'直接报数字："大概500万？"',s:2,f:'没有拆解过程。'},{t:'"这个问题太奇怪了，和我的专业不相关"',s:0,f:'拒绝回答暴露缺乏结构化思维。'},{t:'按平台分层再按场景细分估算',s:20,f:'分层思路好。说明假设依据会更严谨。'}]},
+  {q:'面试官：「你最大的缺点是什么？」(行为经典)',opts:[{t:'坦诚分享真实但非致命的缺点，然后说明已意识到并积极改进(有具体行动和阶段性成果)。',s:25,f:'缺点真实但非致命；有自知之明且已在执行改进。'},{t:'"我最大的缺点是太努力了"',s:2,f:'伪装成优点的缺点，不真诚。'},{t:'说和岗位无关的缺点如"不会做饭"',s:4,f:'没认真准备。'},{t:'分享曾经是缺点但已克服的例子',s:20,f:'改进故事有说服力。也讲讲现在还在改进的。'}]},
+  {q:'面试官：「如果有多个公司给你发offer，怎么选？」(价值观)',opts:[{t:'列出决策维度：业务方向是否匹配长期规划(权重最高)→团队文化→成长空间→城市(薪资权重较低)。强调前3年学什么比起薪重要。',s:25,f:'有条理、有主见。'},{t:'"我肯定选腾讯"',s:5,f:'太刻意。'},{t:'直接问"你们能给多少？"',s:0,f:'薪资谈判应在拿到offer后。'},{t:'综合评估，业务匹配度和团队文化放前面',s:18,f:'思路对。给具体例子更好。'}]},
+  {q:'面试官：「讲一个你失败的经历，学到了什么？」(抗压反思)',opts:[{t:'坦诚分享真实失败，分析原因链(具体哪个决策点出问题)，然后说明后来在类似场景下做了哪些改变、取得什么不同结果。',s:25,f:'失败故事比成功故事更有说服力。'},{t:'"好像没有特别失败的经历"',s:3,f:'挑战不够大或缺乏复盘习惯。'},{t:'讲失败但归因于"队友不给力"',s:1,f:'归因于外是最差的回答。'},{t:'讲了大二时的小失败说"现在已经完全不是这样了"',s:14,f:'太安全了。分享更近期的失败经历更好。'}]}
+];
+
+function startSenior() {
+  State.roundIndex = 0; State.score = 0; State.impression = 50; State.seniorPhase = 0;
+  State.seniorPool = shuffle(INTERVIEW_QUESTIONS);
+  State.seniorPool.forEach(function(q) { q.opts = shuffle(q.opts); });
+  updateImpression();
+  setDialogue('欢迎来到多结局压力面试！7道高频真题(每次随机5题+乱序选项)。注意面试官好感度——真诚有思考的回答加分，背诵敷衍的回答扣分。好感度决定最终结局！');
+  $('game-stage').innerHTML = '<div class="text-center py-8"><div class="text-5xl mb-3">&#x1F4CB;</div><p class="text-slate-500 text-sm">7道题库 | 随机抽5题 | 选项乱序 | 好感度决定结局</p></div>';
+  $('action-area').innerHTML = '<button onclick="startInterview()" class="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-xl transition-all text-sm">开始模拟面试</button><button onclick="showEmotionSupport()" class="w-full py-3 text-pink-700 font-medium rounded-xl transition-all text-sm mt-2" style="background:#fdf2f8;border:1px solid #fbcfe8;">先进情绪加油站坐坐</button>';
+}
+
+function updateImpression() {
+  var bar = $('bar-impression'), val = $('val-impression'), face = $('interviewer-face');
+  if (bar) bar.style.width = State.impression + '%';
+  if (val) val.textContent = State.impression;
+  if (face) {
+    if (State.impression >= 70) face.innerHTML = '&#x1F60A;';
+    else if (State.impression >= 40) face.innerHTML = '&#x1F610;';
+    else face.innerHTML = '&#x1F615;';
+  }
+}
+
+function startInterview() { State.seniorPhase = 1; State.roundIndex = 0; State.score = 0; State.impression = 50; updateImpression(); renderSeniorRound(); }
+
+function renderSeniorRound() {
+  if (State.roundIndex >= 5) { finishSenior(); return; }
+  var round = State.seniorPool[State.roundIndex];
+  if (!round) { finishSenior(); return; }
+  clearStage();
+  var rounds = ['群面','专业初试','专业复试','总监交叉面','HR终面'];
+  $('game-stage').innerHTML = '<div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100"><div class="flex items-center justify-between mb-3"><span class="text-xs font-bold text-purple-600">第' + (State.roundIndex + 1) + '/5题 [' + rounds[State.roundIndex] + ']</span><span class="text-xs text-slate-400" id="qte-timer-label">剩余 15s</span></div><div class="stat-bar-bg mb-4 h-2.5"><div id="qte-bar" class="qte-bar h-2.5" style="width:100%;background:#7c3aed;"></div></div><p class="text-slate-800 font-medium text-sm leading-relaxed">' + round.q + '</p><div id="qte-feedback" class="mt-3"></div></div>';
+  var letters = ['A','B','C','D'], actionHTML = '<button id="qte-pause-btn" onclick="pauseQTETimer()" class="w-full py-2 text-xs text-purple-600 hover:bg-purple-50 rounded-xl transition-all mb-1">请求思考时间 (可用1次)</button>';
+  round.opts.forEach(function(opt, i) {
+    actionHTML += '<button id="qte-opt-' + i + '" onclick="selectAnswer(' + i + ')" class="choice-btn w-full text-left px-4 py-3 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-slate-700 text-sm transition-all duration-200">' + letters[i] + '. ' + opt.t + '</button>';
+  });
+  $('action-area').innerHTML = actionHTML;
+  startQTETimer();
+}
+
+function startQTETimer() {
+  var timeLeft = 15, bar = $('qte-bar'), label = $('qte-timer-label'), self = State;
+  State._qtePaused = false; State._qteUsedPause = false;
+  var tid = setInterval(function() {
+    if (self._qtePaused) return;
+    timeLeft--;
+    if (bar) bar.style.width = (timeLeft / 15 * 100) + '%';
+    if (label) label.textContent = '剩余 ' + timeLeft + 's';
+    if (timeLeft <= 5 && timeLeft > 0) { AudioFX.tick(); if (bar) bar.style.background = '#ef4444'; if (label) { label.classList.add('urgent-pulse'); label.classList.add('text-red-500'); } }
+    if (timeLeft <= 0) { AudioFX.buzzer(); clearInterval(tid); timeUp(); }
+  }, 1000);
+  State.addTimer(tid);
+  State._qteTimerId = tid;
+  State._qteTimeLeft = function() { return timeLeft; };
+  State._qteSetTime = function(t) { timeLeft = t; };
+}
+
+function pauseQTETimer() {
+  if (State._qteUsedPause || State._qtePaused) return;
+  State._qtePaused = true; State._qteUsedPause = true;
+  var btn = $('qte-pause-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '思考中... (+5s)'; btn.style.background = '#faf5ff'; }
+  var label = $('qte-timer-label'); if (label) label.textContent = '暂停中...';
+  setTimeout(function() {
+    State._qtePaused = false;
+    var t = State._qteTimeLeft(); State._qteSetTime(t + 5);
+    if (label) label.textContent = '剩余 ' + State._qteTimeLeft() + 's';
+    if (btn) { btn.textContent = '额外时间已用'; btn.style.color = '#9ca3af'; }
+  }, 2000);
+}
+
+function timeUp() {
+  State.clearAllTimers();
+  var btns = document.querySelectorAll('#action-area button');
+  for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
+  var fb = $('qte-feedback'); if (fb) fb.innerHTML = '<p class="text-red-500 text-sm">时间到！超时不答=放弃。</p>';
+  State.roundIndex++;
+  State.impression = Math.max(0, State.impression - 15); updateImpression();
+  State.addStat('selfDrive', -5); State.updateUI();
+  setTimeout(function() { renderSeniorRound(); }, 2500);
+}
+
+function selectAnswer(index) {
+  State.clearAllTimers();
+  var round = State.seniorPool[State.roundIndex];
+  if (!round || !round.opts || !round.opts[index]) return;
+  var opt = round.opts[index], score = opt.s || 0, fbText = opt.f || '';
+  var btns = document.querySelectorAll('#action-area button');
+  for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
+  var sel = $('qte-opt-' + index);
+  if (sel) { sel.style.borderColor = '#7c3aed'; sel.style.background = '#faf5ff'; }
+  var impDelta = score >= 20 ? 12 : (score >= 10 ? 3 : -10);
+  State.impression = Math.max(0, Math.min(100, State.impression + impDelta));
+  updateImpression();
+  if (score >= 20) AudioFX.success();
+  else if (score >= 10) AudioFX.ding();
+  else AudioFX.fail();
+  State.score += score;
+  State.addStat('readiness', Math.floor(score / 3));
+  State.addStat('competency', Math.floor(score / 5));
+  State.updateUI();
+  State.roundIndex++;
+  var bgColor = score >= 20 ? '#f0fdf4' : (score >= 10 ? '#fefce8' : '#fef2f2');
+  var txtColor = score >= 20 ? '#15803d' : (score >= 10 ? '#854d0e' : '#991b1b');
+  var labelStr = score >= 20 ? '优秀！好感度 +' + impDelta : (score >= 10 ? '还行，好感度 +' + impDelta : '不太理想，好感度 ' + impDelta);
+  var cumulativeInfo = '本题得分 +' + score + '，累计面试分 ' + State.score + ' / 125';
+  var fb = $('qte-feedback');
+  if (fb) fb.innerHTML = '<div class="rounded-lg p-3 text-xs" style="background:' + bgColor + ';color:' + txtColor + ';">' + labelStr + '<br>' + fbText + '<br><span class="opacity-60">' + cumulativeInfo + '</span></div>';
+  setTimeout(function() { setDialogue('HR点评：' + fbText); renderSeniorRound(); }, 2500);
+}
+
+function finishSenior() {
+  clearStage();
+  var maxScore = 125, pct = Math.round(State.score / maxScore * 100);
+  var stage = $('game-stage'), actionHTML = '';
+
+  if (pct >= 60 && State.impression >= 50) {
+    stage.innerHTML = '<div class="rounded-xl p-6 text-center" style="animation:popIn 0.4s ease forwards;background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:2px solid #0052D9;"><div class="text-4xl mb-2">&#x1F4C3;</div><div class="font-black text-lg text-slate-800 mb-1">未来鹅训练营 入营通知书</div><div class="text-xs text-slate-500 mb-3">Tencent Future Goose Academy</div><div class="text-sm text-slate-700 leading-relaxed mb-3">恭喜！基于你在模拟面试中的优秀表现（面试分' + State.score + '/' + maxScore + '，好感度' + State.impression + '），AI学长认定你已经具备了冲击腾讯校招的核心素质。</div><div class="rounded-lg p-3 text-xs" style="background:#f0fdf4;color:#15803d;">"真诚、结构化思维和对岗位的理解是你最大的武器。"</div></div>';
+    setDialogue('恭喜！你的面试表现非常出色。但这只是模拟，真正的秋招还需要持续准备。');
+    showCompleteModal('&#x1F3AF;', '斩获Offer! 入营通知书', '面试得分: ' + State.score + '/' + maxScore + ' (' + pct + '%)\n好感度: ' + State.impression);
+  } else {
+    stage.innerHTML = '<div class="rounded-xl p-6 text-center" style="animation:popIn 0.4s ease forwards;background:#fef2f2;border:1px solid #fecaca;"><div class="text-4xl mb-2">&#x1F4E8;</div><div class="font-black text-lg text-slate-800 mb-1">感谢你的参与</div><div class="text-xs text-slate-500 mb-3">面试分' + State.score + '/' + maxScore + ' | 好感度' + State.impression + '</div><div class="text-sm text-slate-700 leading-relaxed mb-3">很遗憾这次模拟面试没有达到理想的结果。但在腾讯，绝大多数T5/T6的资深专家在学生时代也收到过真正的感谢信。</div><div class="rounded-lg p-3 text-xs" style="background:#fef3c7;color:#92400e;">"AI学长为你申请了复活赛：随时可以重新开始模拟面试。每一次练习都在让你变得更强。"</div></div>';
+    setDialogue('模拟面试没有通过——但这正是模拟的意义。提前暴露问题，提前改进。');
+    showCompleteModal('&#x1F4E8;', '挂了，但没完全挂', '面试得分: ' + State.score + '/' + maxScore + ' (' + pct + '%)\n好感度: ' + State.impression + '\n"AI学长为你申请了复活赛"');
+  }
+
+  actionHTML = '<button onclick="showEmotionSupport()" class="w-full py-3 text-pink-700 font-medium rounded-xl transition-all text-sm mt-2" style="background:#fdf2f8;border:1px solid #fbcfe8;">去情绪加油站休息</button><button onclick="backToEntry()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-2">返回首页</button>' + linkBtn('带着面试经验，直通官网投递');
+  $('action-area').innerHTML = actionHTML;
+}
+
+function showEmotionSupport() {
+  clearStage(); State.clearAllTimers();
+  var msgs = ['你为一场面试准备了整整两周——刷面经、写逐字稿、找同学模拟。你已经比昨天更好了。','被拒不代表你不行。面试有太多随机因素——面试官那天可能心情不好、岗位可能已有人选。这都不是你的问题。','腾讯大多数T5/T6的同事在面试时也被拒过至少一次。他们现在带团队、做架构、发顶会。秋招只是起点。','允许自己休息。今天不刷题、不看面经、不想面试——去跑步、看电影、和朋友吃饭。高质量休息是最高效的准备。','你已经很努力了。努力本身就很了不起。不管你最后去了哪家公司——你都会成为很棒的工程师/产品经理/设计师。'];
+  var msg = msgs[Math.floor(Math.random() * msgs.length)];
+  $('game-stage').innerHTML = '<div class="rounded-xl p-6 text-center" style="background:#fdf2f8;border:1px solid #fbcfe8;"><div class="text-5xl mb-3">&#x2615;</div><p class="text-slate-700 text-sm leading-relaxed mb-4">' + msg + '</p><div class="rounded-lg p-3 text-xs" style="background:#fce7f3;color:#be185d;">来自AI学长的悄悄话——我们都在经历一样的事。</div></div><div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 mt-3"><div class="font-bold text-xs text-slate-700 mb-2">匿名树洞 (写下烦恼，AI倾听)</div><textarea id="treehole-input" class="w-full border border-slate-200 rounded-lg p-2 text-xs text-slate-600" rows="2" placeholder="例如：我最近很焦虑...秋招没有信心...不知道该选什么方向..."></textarea><button onclick="submitTreehole()" class="w-full mt-2 py-2 bg-pink-50 hover:bg-pink-100 text-pink-700 font-medium rounded-xl text-xs transition-all">投入树洞</button><div id="treehole-response" class="mt-2"></div></div>';
+  setDialogue('嘿，我能感觉到你可能有些累或焦虑。这很正常——秋招是大多数人人生中压力最大的时段。先深呼吸三次。这里还有一个小树洞，可以把烦恼写进去。');
+  $('action-area').innerHTML = '<button onclick="showEmotionSupport()" class="w-full py-3 text-pink-700 font-medium rounded-xl transition-all text-sm" style="background:#fdf2f8;border:1px solid #fbcfe8;">换一句暖心的话</button><button onclick="startSenior()" class="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-xl transition-all text-sm">休息好了，重新开始</button><button onclick="backToEntry()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-sm">返回首页</button>' + linkBtn('直通官网，看看秋招最新动态');
+}
+
+function submitTreehole() {
+  var input = $('treehole-input');
+  if (!input || !input.value.trim()) return;
+  var text = input.value.trim().toLowerCase();
+  var respEl = $('treehole-response'); if (!respEl) return;
+  var response = '';
+  if (text.indexOf('焦虑') >= 0 || text.indexOf('担心') >= 0 || text.indexOf('紧张') >= 0 || text.indexOf('压力') >= 0) {
+    response = '焦虑是正常的——说明你在乎这件事。试着把焦虑写下来、说给朋友听，或者去跑个步。焦虑会在行动中慢慢消散，不会在空想中消失。';
+  } else if (text.indexOf('没有信心') >= 0 || text.indexOf('不行') >= 0 || text.indexOf('很差') >= 0 || text.indexOf('不够') >= 0) {
+    response = '你知道吗，面试官最怕的不是"能力不够"的人，而是"假装很强"的人。你的自我怀疑恰恰说明你有清晰的自我认知——这本身就是职场中非常宝贵的品质。';
+  } else if (text.indexOf('方向') >= 0 || text.indexOf('不知道') >= 0 || text.indexOf('迷茫') >= 0 || text.indexOf('选什么') >= 0) {
+    response = '就业方向不是一次选定的，而是一步步试出来的。先找一个你目前最感兴趣的方向去尝试，哪怕是一个小项目、一次实习申请。行动会让你越来越清晰。';
+  } else if (text.indexOf('面试') >= 0 || text.indexOf('挂了') >= 0 || text.indexOf('没过') >= 0) {
+    response = '面试不过的原因有上百种——大多数和你的能力无关。我有一个朋友被腾讯拒了3次，第4次才拿到offer，现在已经是T5了。面试这件事，是可以通过刻意练习不断提升的。';
+  } else {
+    response = '谢谢你愿意分享。虽然AI学长不能完全理解你的心情，但我想告诉你：你正在经历的这些，成千上万的同龄人也在经历。你并不孤单。每一步都算数。';
+  }
+  respEl.innerHTML = '<div class="rounded-lg p-3 text-xs" style="background:#fdf2f8;color:#be185d;">' + response + '</div>';
+  input.value = '';
+  AudioFX.ding();
+}
+
+// ==================== 全局 ====================
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    var cm = $('complete-modal'), gs = $('game-screen');
+    if (cm && cm.style.display !== 'none') closeModal();
+    else if (gs && gs.style.display !== 'none') backToEntry();
+  }
+});
+
+document.addEventListener('keydown', function(e) {
+  if (State.seniorPhase === 1 && !State.gameRunning && !document.querySelector('#action-area button:disabled')) {
+    var idx = parseInt(e.key) - 1;
+    if (idx >= 0 && idx < 4 && $('qte-opt-' + idx) && !$('qte-opt-' + idx).disabled) selectAnswer(idx);
+  }
+});
+
+showEntry();
+</script>
+</body>
+</html>
