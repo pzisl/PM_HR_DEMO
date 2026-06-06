@@ -22,7 +22,7 @@
   .flip-card-back { background: linear-gradient(135deg, #0052D9, #366ef4); color: #fff; transform: rotateY(180deg); overflow-y: auto; }
 
   .game-canvas { position: relative; overflow: hidden; background: linear-gradient(180deg, #e8f0fe 0%, #dbeafe 100%); border-radius: 16px; user-select: none; -webkit-user-select: none; touch-action: none; }
-  @keyframes fallDown { from{transform:translateY(-60px)} to{transform:translateY(420px)} }
+  @keyframes fallDown { from{transform:translateY(-60px)} to{transform:translateY(var(--fall-distance, 420px))} }
   .fall-item { position: absolute; animation: fallDown linear forwards; pointer-events: none; border-radius: 12px; padding: 6px 10px; font-size: 24px; text-align: center; z-index: 5; white-space: nowrap; border: 2px solid #e5e7eb; background: #fff; border-left-width: 4px; }
   .fall-item.trap-hint { border-left-color: #fca5a5; background: #fff5f5; }
   .fall-item.golden-hint { border-left-color: #fcd34d; background: #fffdf5; }
@@ -459,7 +459,11 @@ function startSophomore() {
 }
 
 function renderSophomoreStage() {
-  $('game-stage').innerHTML = '<div class="text-center mb-2 flex justify-between items-center px-2"><span class="text-sm font-bold text-slate-600">得分: <span id="catch-score" class="text-green-600">0</span></span><span class="text-sm font-bold text-slate-600">倒计时: <span id="catch-timer" class="text-blue-600">25</span>s</span></div><div class="game-canvas relative mx-auto" id="catch-canvas" style="width:100%;height:380px;" tabindex="0" aria-label="技能接接乐游戏区"><div class="penguin" id="penguin" style="width:56px;text-align:center;font-size:40px;line-height:1;">&#x1F427;</div></div>';
+  // 动态计算画布高度：手机上约为视口高度的40%，桌面端固定380px
+  var vh = window.innerHeight;
+  var canvasH = vh < 768 ? Math.floor(vh * 0.40) : 380;
+  canvasH = Math.max(280, Math.min(canvasH, 500)); // 限制在280-500之间
+  $('game-stage').innerHTML = '<div class="text-center mb-2 flex justify-between items-center px-2"><span class="text-sm font-bold text-slate-600">得分: <span id="catch-score" class="text-green-600">0</span></span><span class="text-sm font-bold text-slate-600">倒计时: <span id="catch-timer" class="text-blue-600">25</span>s</span></div><div class="game-canvas relative mx-auto" id="catch-canvas" style="width:100%;height:' + canvasH + 'px;" tabindex="0" aria-label="技能接接乐游戏区"><div class="penguin" id="penguin" style="width:56px;text-align:center;font-size:40px;line-height:1;">&#x1F427;</div></div>';
   $('action-area').innerHTML = '<p class="text-xs text-slate-400 text-center">拖动企鹅或键盘方向键接住技能 | 红色左边缘=陷阱 金色左边缘=稀有奖励</p><button id="btn-start-catch" onclick="startCatchGame()" class="w-full py-3 bg-green-500 hover:bg-green-400 text-white font-medium rounded-xl transition-all text-sm">开始接接乐 (25秒)</button>';
 }
 
@@ -498,6 +502,8 @@ function startCatchGame() {
 
   // 掉落物
   var activeItems = [];
+  // 动态计算动画下落距离：画布高度 + 60px起始偏移 + 40px底部缓冲
+  var fallDistance = canvas.clientHeight + 60 + 40;
   function spawnItem() {
     if (!self.gameRunning) return;
     var rand = Math.random();
@@ -508,7 +514,10 @@ function startCatchGame() {
     el.className = 'fall-item' + (cat === 'trap' ? ' trap-hint' : '') + (cat === 'golden' ? ' golden-hint' : '');
     el.style.left = (5 + Math.random() * 80) + '%';
     el.style.top = '-60px';
-    el.style.animationDuration = (2.5 + Math.random() * 2.5) + 's';
+    var animSec = 2.5 + Math.random() * 2.5;
+    el.style.animationDuration = animSec + 's';
+    // 动态设置下落距离，确保落到画布底部
+    el.style.setProperty('--fall-distance', fallDistance + 'px');
     el.innerHTML = '<span class="text-xs font-bold">' + item.l + '</span>';
     el.dataset.cat = cat;
     el.dataset.pts = item.pts;
@@ -516,14 +525,13 @@ function startCatchGame() {
     canvas.appendChild(el);
     activeItems.push(el);
 
-    // 用动画时长+缓冲来定时清理，避免依赖不可靠的 animationend
-    var animSec = parseFloat(el.style.animationDuration) || 4;
+    // 用动画时长+充足缓冲来定时清理（手机端动画可能降频，缓冲加大到800ms）
     setTimeout(function() {
       if (el._caught) return;
       var idx = activeItems.indexOf(el);
       if (idx >= 0) activeItems.splice(idx, 1);
       if (el.parentNode) el.remove();
-    }, animSec * 1000 + 300);
+    }, animSec * 1000 + 800);
 
     if (self.gameRunning) setTimeout(spawnItem, 500 + Math.random() * 700);
   }
@@ -660,12 +668,20 @@ function selectJuniorRole(role) {
 function renderJuniorFindStage() {
   var stage = $('game-stage'), rd = RESUME_ROLES[State.juniorRole], fixes = rd.fixes;
   var fixedCount = Object.keys(State.fixedResumeItems).filter(function(k) { return State.fixedResumeItems[k] === 'fixed'; }).length;
-  var html = '<div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100 text-sm leading-relaxed text-slate-700"><div class="text-center mb-4"><div class="font-black text-lg text-slate-800">求职简历</div><div class="text-xs text-slate-400">应聘：' + rd.name + ' | 大三 | XX大学</div></div><div class="mb-2"><span class="font-bold">项目与经历 (点击红色虚线直接修复)</span></div><ul class="space-y-2 mb-4">';
+  // 去掉任何固定高度限制，使用 min-height 自适应 + overflow-y:auto 支持滚动
+  var html = '<div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-slate-100 text-sm leading-relaxed text-slate-700" style="min-height:200px;max-height:70vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">';
+  html += '<div class="text-center mb-4"><div class="font-black text-lg text-slate-800">求职简历</div><div class="text-xs text-slate-400">应聘：' + rd.name + ' | 大三 | XX大学</div></div>';
+  html += '<div class="mb-2"><span class="font-bold">项目与经历 (点击红色虚线直接修复)</span></div>';
+  html += '<ul class="space-y-3 mb-4">';
   fixes.forEach(function(fix, i) {
     var isFixed = State.fixedResumeItems[i] === 'fixed';
-    html += '<li class="flex items-start gap-2"><span class="text-slate-300">&#x2022;</span>';
-    if (isFixed) { html += '<span class="resume-bad fixed">' + fix.good + '</span><span class="text-green-500 text-xs mt-0.5">&#x2714;</span>'; }
-    else { html += '<span class="resume-bad" id="bad-' + i + '" onclick="fixResumeIssue(' + i + ')">' + fix.bad + '</span><span class="text-xs text-red-400 mt-0.5 cursor-pointer" onclick="fixResumeIssue(' + i + ')">点击修复</span>'; }
+    html += '<li class="flex items-start gap-2" style="min-height:28px;">';
+    html += '<span class="text-slate-300 shrink-0" style="margin-top:2px;">&#x2022;</span>';
+    if (isFixed) {
+      html += '<span class="resume-bad fixed" style="flex:1;">' + fix.good + '</span><span class="text-green-500 text-xs shrink-0" style="margin-top:2px;">&#x2714;</span>';
+    } else {
+      html += '<span class="resume-bad" id="bad-' + i + '" onclick="fixResumeIssue(' + i + ')" style="flex:1;">' + fix.bad + '</span><span class="text-xs text-red-400 mt-0.5 cursor-pointer shrink-0" onclick="fixResumeIssue(' + i + ')" style="margin-top:2px;">点击修复</span>';
+    }
     html += '</li>';
   });
   html += '</ul></div>';
