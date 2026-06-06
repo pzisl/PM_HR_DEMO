@@ -512,10 +512,18 @@ function startCatchGame() {
     el.innerHTML = '<span class="text-xs font-bold">' + item.l + '</span>';
     el.dataset.cat = cat;
     el.dataset.pts = item.pts;
-    el.dataset.startTime = Date.now();
-    el.dataset.duration = parseFloat(el.style.animationDuration) * 1000;
+    el._caught = false;
     canvas.appendChild(el);
     activeItems.push(el);
+
+    // 用动画时长+缓冲来定时清理，避免依赖不可靠的 animationend
+    var animSec = parseFloat(el.style.animationDuration) || 4;
+    setTimeout(function() {
+      if (el._caught) return;
+      var idx = activeItems.indexOf(el);
+      if (idx >= 0) activeItems.splice(idx, 1);
+      if (el.parentNode) el.remove();
+    }, animSec * 1000 + 300);
 
     if (self.gameRunning) setTimeout(spawnItem, 500 + Math.random() * 700);
   }
@@ -525,18 +533,12 @@ function startCatchGame() {
   function collisionLoop() {
     if (!self.gameRunning) { activeItems = []; return; }
     var pRect = penguin.getBoundingClientRect();
-    var now = Date.now();
     for (var i = activeItems.length - 1; i >= 0; i--) {
       var el = activeItems[i];
-      if (!el || !el.parentNode) { activeItems.splice(i, 1); continue; }
-      // 清理已过动画时长或已掉落出画布的物品
-      var elapsed = now - (parseInt(el.dataset.startTime) || now);
-      var dur = parseFloat(el.dataset.duration) || 4500;
-      if (elapsed > dur + 200) { el.remove(); activeItems.splice(i, 1); continue; }
+      if (!el || !el.parentNode || el._caught) { activeItems.splice(i, 1); continue; }
       var eRect = el.getBoundingClientRect();
-      var canvasRect = canvas.getBoundingClientRect();
-      if (eRect.top > canvasRect.bottom + 20) { el.remove(); activeItems.splice(i, 1); continue; }
       if (eRect.bottom >= pRect.top && eRect.left < pRect.right && eRect.right > pRect.left && eRect.top < pRect.bottom) {
+        el._caught = true;
         var cat = el.dataset.cat;
         if (cat === 'trap') { self.score = Math.max(0, self.score + parseInt(el.dataset.pts)); el.style.background = '#fee2e2'; self.catchStats.trap++; AudioFX.fail(); }
         else if (cat === 'golden') { self.score += parseInt(el.dataset.pts); el.style.background = '#fef3c7'; self.catchStats.golden++; AudioFX.success(); }
@@ -677,17 +679,9 @@ function fixResumeIssue(i) {
   State.fixedResumeItems[i] = 'fixed';
   State.score += 2;
   State.addStat('competency', 10); State.addStat('readiness', 8); State.updateUI(); saveProgress();
-  var el = $('bad-' + i);
-  if (el) { el.classList.add('fixed'); el.textContent = rd.fixes[i].good; el.onclick = null; }
   setDialogue('修复完成！雷区：' + rd.fixes[i].spot + '\n\n修改后：' + rd.fixes[i].good);
-  var fixedCount = Object.keys(State.fixedResumeItems).filter(function(k) { return State.fixedResumeItems[k] === 'fixed'; }).length;
-  var cntEl = $('resume-fix-count'), fixes = rd.fixes;
-  if (cntEl) {
-    cntEl.textContent = '已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')';
-    if (fixedCount >= fixes.length) {
-      cntEl.parentNode.innerHTML = '<div class="text-center text-xs text-slate-400">已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')</div><button onclick="startTranslator()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-2">第一关通关！进入项目翻译机</button>';
-    }
-  }
+  // 重新渲染整个列表，确保手机窄屏布局正确
+  renderJuniorFindStage();
 }
 
 function startTranslator() {
