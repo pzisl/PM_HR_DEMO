@@ -28,7 +28,7 @@
   .fall-item.golden-hint { border-left-color: #fcd34d; background: #fffdf5; }
   .penguin { position: absolute; bottom: 8px; left: 0; transform: translateX(0px); will-change: transform; z-index: 10; }
 
-  .resume-bad { background: #fee2e2; border-bottom: 2px dashed #ef4444; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.4s ease; display: inline-block; margin: 1px 0; }
+  .resume-bad { background: #fee2e2; border-bottom: 2px dashed #ef4444; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.4s ease; display: block; margin: 1px 0; word-break: break-word; overflow-wrap: break-word; }
   .resume-bad:hover { background: #fecaca; }
   .resume-bad.fixed { background: #d1fae5; border-bottom: 2px solid #10b981; cursor: default; animation: fixPulse 0.4s ease; }
   @keyframes fixPulse { 0%{transform:scale(1)} 50%{transform:scale(1.06)} 100%{transform:scale(1)} }
@@ -512,14 +512,10 @@ function startCatchGame() {
     el.innerHTML = '<span class="text-xs font-bold">' + item.l + '</span>';
     el.dataset.cat = cat;
     el.dataset.pts = item.pts;
+    el.dataset.startTime = Date.now();
+    el.dataset.duration = parseFloat(el.style.animationDuration) * 1000;
     canvas.appendChild(el);
     activeItems.push(el);
-
-    el.addEventListener('animationend', function() {
-      var idx = activeItems.indexOf(el);
-      if (idx >= 0) activeItems.splice(idx, 1);
-      if (el.parentNode) el.remove();
-    });
 
     if (self.gameRunning) setTimeout(spawnItem, 500 + Math.random() * 700);
   }
@@ -529,10 +525,17 @@ function startCatchGame() {
   function collisionLoop() {
     if (!self.gameRunning) { activeItems = []; return; }
     var pRect = penguin.getBoundingClientRect();
+    var now = Date.now();
     for (var i = activeItems.length - 1; i >= 0; i--) {
       var el = activeItems[i];
       if (!el || !el.parentNode) { activeItems.splice(i, 1); continue; }
+      // 清理已过动画时长或已掉落出画布的物品
+      var elapsed = now - (parseInt(el.dataset.startTime) || now);
+      var dur = parseFloat(el.dataset.duration) || 4500;
+      if (elapsed > dur + 200) { el.remove(); activeItems.splice(i, 1); continue; }
       var eRect = el.getBoundingClientRect();
+      var canvasRect = canvas.getBoundingClientRect();
+      if (eRect.top > canvasRect.bottom + 20) { el.remove(); activeItems.splice(i, 1); continue; }
       if (eRect.bottom >= pRect.top && eRect.left < pRect.right && eRect.right > pRect.left && eRect.top < pRect.bottom) {
         var cat = el.dataset.cat;
         if (cat === 'trap') { self.score = Math.max(0, self.score + parseInt(el.dataset.pts)); el.style.background = '#fee2e2'; self.catchStats.trap++; AudioFX.fail(); }
