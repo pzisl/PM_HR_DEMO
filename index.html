@@ -28,7 +28,7 @@
   .fall-item.golden-hint { border-left-color: #fcd34d; background: #fffdf5; }
   .penguin { position: absolute; bottom: 8px; left: 0; transform: translateX(0px); will-change: transform; z-index: 10; }
 
-  .resume-bad { background: #fee2e2; border-bottom: 2px dashed #ef4444; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.4s ease; display: block; margin: 1px 0; word-break: break-word; overflow-wrap: break-word; }
+  .resume-bad { background: #fee2e2; border-bottom: 2px dashed #ef4444; padding: 2px 4px; border-radius: 4px; cursor: pointer; transition: all 0.4s ease; word-break: break-word; overflow-wrap: break-word; }
   .resume-bad:hover { background: #fecaca; }
   .resume-bad.fixed { background: #d1fae5; border-bottom: 2px solid #10b981; cursor: default; animation: fixPulse 0.4s ease; }
   @keyframes fixPulse { 0%{transform:scale(1)} 50%{transform:scale(1.06)} 100%{transform:scale(1)} }
@@ -672,41 +672,60 @@ function selectJuniorRole(role) {
   renderJuniorFindStage();
 }
 
+// ===== 大三简历渲染（状态驱动纯块级流布局） =====
 function renderJuniorFindStage() {
   var stage = $('game-stage'), rd = RESUME_ROLES[State.juniorRole], fixes = rd.fixes;
-  var fixedCount = Object.keys(State.fixedResumeItems).filter(function(k) { return State.fixedResumeItems[k] === 'fixed'; }).length;
-  // h-auto 自适应高度，overflow-visible 确保修复后的长文本不被裁剪
-  var html = '<div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-slate-100 text-sm leading-relaxed text-slate-700 h-auto" style="overflow:visible;">';
-  html += '<div class="text-center mb-4"><div class="font-black text-lg text-slate-800">求职简历</div><div class="text-xs text-slate-400">应聘：' + rd.name + ' | 大三 | XX大学</div></div>';
-  html += '<div class="mb-2"><span class="font-bold">项目与经历 (点击红色虚线直接修复)</span></div>';
-  html += '<ul class="space-y-3 mb-4" style="overflow:visible;">';
-  fixes.forEach(function(fix, i) {
+  var fixedCount = 0;
+  for (var k in State.fixedResumeItems) {
+    if (State.fixedResumeItems[k] === 'fixed') fixedCount++;
+  }
+
+  // 构建 HTML：纯块级文档流，无 flex、无 absolute、无 overflow-hidden
+  var html = '';
+  html += '<div style="background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(0,82,217,0.08);border:1px solid #f1f5f9;font-size:14px;line-height:1.6;color:#334155;">';
+  html += '<div style="text-align:center;margin-bottom:16px;">';
+  html += '<div style="font-weight:900;font-size:18px;color:#1e293b;">求职简历</div>';
+  html += '<div style="font-size:12px;color:#94a3b8;">应聘：' + rd.name + ' | 大三 | XX大学</div>';
+  html += '</div>';
+  html += '<div style="font-weight:700;margin-bottom:8px;">项目与经历 (点击红色虚线直接修复)</div>';
+
+  for (var i = 0; i < fixes.length; i++) {
+    var fix = fixes[i];
     var isFixed = State.fixedResumeItems[i] === 'fixed';
-    // 每条 item 使用 clear:both + overflow:visible，修复后像抽屉一样向下推开后续条目
-    html += '<li class="flex items-start gap-2" style="min-height:32px;clear:both;overflow:visible;">';
-    html += '<span class="text-slate-300 shrink-0" style="margin-top:2px;">&#x2022;</span>';
+    // 每条条目：独立的块级容器，占据完整行宽，自然撑开
+    html += '<div style="margin-bottom:12px;width:100%;clear:both;">';
+    html += '<span style="color:#cbd5e1;margin-right:6px;">&#x2022;</span>';
     if (isFixed) {
-      html += '<span class="resume-bad fixed" style="flex:1;word-break:break-word;">' + fix.good + '</span><span class="text-green-500 text-xs shrink-0" style="margin-top:2px;">&#x2714;</span>';
+      html += '<span class="resume-bad fixed" style="display:inline;word-break:break-word;">' + fix.good + '</span>';
+      html += ' <span style="color:#10b981;font-size:12px;">&#x2714;</span>';
     } else {
-      html += '<span class="resume-bad" id="bad-' + i + '" onclick="fixResumeIssue(' + i + ')" style="flex:1;word-break:break-word;">' + fix.bad + '</span><span class="text-xs text-red-400 mt-0.5 cursor-pointer shrink-0" onclick="fixResumeIssue(' + i + ')" style="margin-top:2px;">点击修复</span>';
+      html += '<span class="resume-bad" id="bad-' + i + '" onclick="fixResumeIssue(' + i + ')" style="display:inline;word-break:break-word;">' + fix.bad + '</span>';
+      html += ' <span style="color:#ef4444;font-size:12px;cursor:pointer;" onclick="fixResumeIssue(' + i + ')">点击修复</span>';
     }
-    html += '</li>';
-  });
-  html += '</ul></div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
   stage.innerHTML = html;
-  // 让 game-stage 也跟随内容自适应高度，不裁剪溢出
+  // 确保 stage 和上层容器都不裁剪内容
   stage.style.overflow = 'visible';
-  $('action-area').innerHTML = '<div class="text-center text-xs text-slate-400" id="resume-fix-count">已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')</div>' + (fixedCount >= fixes.length ? '<button onclick="startTranslator()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-2">第一关通关！进入项目翻译机</button>' : '');
+  stage.style.height = 'auto';
+  stage.style.maxHeight = 'none';
+
+  $('action-area').innerHTML = '<div style="text-align:center;font-size:12px;color:#94a3b8;" id="resume-fix-count">已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')</div>' + (fixedCount >= fixes.length ? '<button onclick="startTranslator()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-2">第一关通关！进入项目翻译机</button>' : '');
 }
 
+// ===== 状态驱动修复：更新数据 → 整体重渲染 =====
 function fixResumeIssue(i) {
   if (State.fixedResumeItems[i] === 'fixed') return;
   var rd = RESUME_ROLES[State.juniorRole];
+  // 第一步：更新状态数据
   State.fixedResumeItems[i] = 'fixed';
   State.score += 2;
   State.addStat('competency', 10); State.addStat('readiness', 8); State.updateUI(); saveProgress();
+  // 第二步：设置对话提示
   setDialogue('修复完成！雷区：' + rd.fixes[i].spot + '\n\n修改后：' + rd.fixes[i].good);
-  // 重新渲染整个列表，确保手机窄屏布局正确
+  // 第三步：基于最新状态，整体重新渲染列表
   renderJuniorFindStage();
 }
 
