@@ -459,10 +459,11 @@ function startSophomore() {
 }
 
 function renderSophomoreStage() {
-  // 动态计算画布高度：手机上约为视口高度的40%，桌面端固定380px
+  // 完全响应式安全视口：移动端取安全可视高度的45%，桌面端固定380px
   var vh = window.innerHeight;
-  var canvasH = vh < 768 ? Math.floor(vh * 0.40) : 380;
-  canvasH = Math.max(280, Math.min(canvasH, 500)); // 限制在280-500之间
+  var canvasH = vh < 768 ? Math.floor(vh * 0.45) : 380;
+  canvasH = Math.max(260, Math.min(canvasH, 450));
+  // 用 style 属性写入，确保 canvas 实际渲染像素与逻辑计算完全一致
   $('game-stage').innerHTML = '<div class="text-center mb-2 flex justify-between items-center px-2"><span class="text-sm font-bold text-slate-600">得分: <span id="catch-score" class="text-green-600">0</span></span><span class="text-sm font-bold text-slate-600">倒计时: <span id="catch-timer" class="text-blue-600">25</span>s</span></div><div class="game-canvas relative mx-auto" id="catch-canvas" style="width:100%;height:' + canvasH + 'px;" tabindex="0" aria-label="技能接接乐游戏区"><div class="penguin" id="penguin" style="width:56px;text-align:center;font-size:40px;line-height:1;">&#x1F427;</div></div>';
   $('action-area').innerHTML = '<p class="text-xs text-slate-400 text-center">拖动企鹅或键盘方向键接住技能 | 红色左边缘=陷阱 金色左边缘=稀有奖励</p><button id="btn-start-catch" onclick="startCatchGame()" class="w-full py-3 bg-green-500 hover:bg-green-400 text-white font-medium rounded-xl transition-all text-sm">开始接接乐 (25秒)</button>';
 }
@@ -502,8 +503,9 @@ function startCatchGame() {
 
   // 掉落物
   var activeItems = [];
-  // 动态计算动画下落距离：画布高度 + 60px起始偏移 + 40px底部缓冲
-  var fallDistance = canvas.clientHeight + 60 + 40;
+  // 从 canvas 实际渲染像素高度动态计算下落距离，确保与屏幕坐标完全一致
+  var canvasRect = canvas.getBoundingClientRect();
+  var fallDistance = canvasRect.height + 60 + 30;
   function spawnItem() {
     if (!self.gameRunning) return;
     var rand = Math.random();
@@ -516,36 +518,41 @@ function startCatchGame() {
     el.style.top = '-60px';
     var animSec = 2.5 + Math.random() * 2.5;
     el.style.animationDuration = animSec + 's';
-    // 动态设置下落距离，确保落到画布底部
+    // 用 getBoundingClientRect 真实坐标设置下落距离，对齐屏幕像素
     el.style.setProperty('--fall-distance', fallDistance + 'px');
     el.innerHTML = '<span class="text-xs font-bold">' + item.l + '</span>';
     el.dataset.cat = cat;
     el.dataset.pts = item.pts;
     el._caught = false;
+    el._animSec = animSec;
+    el._spawnTime = Date.now();
     canvas.appendChild(el);
     activeItems.push(el);
-
-    // 用动画时长+充足缓冲来定时清理（手机端动画可能降频，缓冲加大到800ms）
-    setTimeout(function() {
-      if (el._caught) return;
-      var idx = activeItems.indexOf(el);
-      if (idx >= 0) activeItems.splice(idx, 1);
-      if (el.parentNode) el.remove();
-    }, animSec * 1000 + 800);
 
     if (self.gameRunning) setTimeout(spawnItem, 500 + Math.random() * 700);
   }
   setTimeout(spawnItem, 300);
 
-  // rAF碰撞检测
+  // rAF碰撞检测 + 基于真实屏幕坐标的清理
   function collisionLoop() {
     if (!self.gameRunning) { activeItems = []; return; }
     var pRect = penguin.getBoundingClientRect();
+    var cRect = canvas.getBoundingClientRect();
+    var now = Date.now();
     for (var i = activeItems.length - 1; i >= 0; i--) {
       var el = activeItems[i];
-      if (!el || !el.parentNode || el._caught) { activeItems.splice(i, 1); continue; }
+      if (!el || !el.parentNode) { activeItems.splice(i, 1); continue; }
       var eRect = el.getBoundingClientRect();
-      if (eRect.bottom >= pRect.top && eRect.left < pRect.right && eRect.right > pRect.left && eRect.top < pRect.bottom) {
+      // 基于真实屏幕坐标清理：方块顶部已超出画布底部即视为已掉落（getBoundingClientRect 包含动画 transform）
+      var pastBottom = eRect.top > cRect.bottom + 10;
+      // 时间兜底：动画时长 + 1秒缓冲后仍未被接住则清理
+      var timedOut = now - el._spawnTime > (el._animSec || 4) * 1000 + 1000;
+      if (pastBottom || timedOut) {
+        if (!el._caught) { el.remove(); activeItems.splice(i, 1); }
+        continue;
+      }
+      // 碰撞检测：方块与企鹅重叠
+      if (!el._caught && eRect.bottom >= pRect.top && eRect.left < pRect.right && eRect.right > pRect.left && eRect.top < pRect.bottom) {
         el._caught = true;
         var cat = el.dataset.cat;
         if (cat === 'trap') { self.score = Math.max(0, self.score + parseInt(el.dataset.pts)); el.style.background = '#fee2e2'; self.catchStats.trap++; AudioFX.fail(); }
@@ -668,24 +675,27 @@ function selectJuniorRole(role) {
 function renderJuniorFindStage() {
   var stage = $('game-stage'), rd = RESUME_ROLES[State.juniorRole], fixes = rd.fixes;
   var fixedCount = Object.keys(State.fixedResumeItems).filter(function(k) { return State.fixedResumeItems[k] === 'fixed'; }).length;
-  // 去掉任何固定高度限制，使用 min-height 自适应 + overflow-y:auto 支持滚动
-  var html = '<div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-slate-100 text-sm leading-relaxed text-slate-700" style="min-height:200px;max-height:70vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">';
+  // h-auto 自适应高度，overflow-visible 确保修复后的长文本不被裁剪
+  var html = '<div class="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-slate-100 text-sm leading-relaxed text-slate-700 h-auto" style="overflow:visible;">';
   html += '<div class="text-center mb-4"><div class="font-black text-lg text-slate-800">求职简历</div><div class="text-xs text-slate-400">应聘：' + rd.name + ' | 大三 | XX大学</div></div>';
   html += '<div class="mb-2"><span class="font-bold">项目与经历 (点击红色虚线直接修复)</span></div>';
-  html += '<ul class="space-y-3 mb-4">';
+  html += '<ul class="space-y-3 mb-4" style="overflow:visible;">';
   fixes.forEach(function(fix, i) {
     var isFixed = State.fixedResumeItems[i] === 'fixed';
-    html += '<li class="flex items-start gap-2" style="min-height:28px;">';
+    // 每条 item 使用 clear:both + overflow:visible，修复后像抽屉一样向下推开后续条目
+    html += '<li class="flex items-start gap-2" style="min-height:32px;clear:both;overflow:visible;">';
     html += '<span class="text-slate-300 shrink-0" style="margin-top:2px;">&#x2022;</span>';
     if (isFixed) {
-      html += '<span class="resume-bad fixed" style="flex:1;">' + fix.good + '</span><span class="text-green-500 text-xs shrink-0" style="margin-top:2px;">&#x2714;</span>';
+      html += '<span class="resume-bad fixed" style="flex:1;word-break:break-word;">' + fix.good + '</span><span class="text-green-500 text-xs shrink-0" style="margin-top:2px;">&#x2714;</span>';
     } else {
-      html += '<span class="resume-bad" id="bad-' + i + '" onclick="fixResumeIssue(' + i + ')" style="flex:1;">' + fix.bad + '</span><span class="text-xs text-red-400 mt-0.5 cursor-pointer shrink-0" onclick="fixResumeIssue(' + i + ')" style="margin-top:2px;">点击修复</span>';
+      html += '<span class="resume-bad" id="bad-' + i + '" onclick="fixResumeIssue(' + i + ')" style="flex:1;word-break:break-word;">' + fix.bad + '</span><span class="text-xs text-red-400 mt-0.5 cursor-pointer shrink-0" onclick="fixResumeIssue(' + i + ')" style="margin-top:2px;">点击修复</span>';
     }
     html += '</li>';
   });
   html += '</ul></div>';
   stage.innerHTML = html;
+  // 让 game-stage 也跟随内容自适应高度，不裁剪溢出
+  stage.style.overflow = 'visible';
   $('action-area').innerHTML = '<div class="text-center text-xs text-slate-400" id="resume-fix-count">已修复 ' + fixedCount + '/' + fixes.length + ' 处 (' + rd.name + ')</div>' + (fixedCount >= fixes.length ? '<button onclick="startTranslator()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-all text-sm mt-2">第一关通关！进入项目翻译机</button>' : '');
 }
 
